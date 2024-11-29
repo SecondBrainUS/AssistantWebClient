@@ -35,9 +35,7 @@
 
       <!-- Chat selector -->
       <div v-if="isSidebarOpen" class="flex items-center space-x-2 p-2 hover:bg-gray-700 rounded mb-4 cursor-pointer">
-        <MessageSquare class="h-5 w-5" />
-        <span>ChatGPT</span>
-        <ChevronDown class="h-4 w-4 ml-auto" />
+        <!--MessageSquare class="h-5 w-5" / -->
       </div>
 
       <!-- Navigation sections -->
@@ -66,8 +64,15 @@
       <div class="flex-1 p-4 overflow-y-auto">
         <div v-if="selectedChat">
           <div v-for="(message, index) in selectedChat.messages" :key="index" class="mb-4">
-            <div class="font-semibold mb-1">{{ message.sender }}</div>
-            <div class="bg-gray-800 p-3 rounded-lg">{{ message.content }}</div>
+            <div class="flex justify-between items-center mb-1">
+              <div class="font-semibold">{{ message.sender }}</div>
+              <div class="text-xs text-gray-400">
+                {{ formatTimestamp(message.timestamp) }}
+              </div>
+            </div>
+            <div :class="[
+              message.sender === 'User' ? 'bg-gray-600 p-3 rounded-lg' : ''
+            ]">{{ message.content }}</div>
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center">
@@ -133,38 +138,24 @@ import {
 
 const chatSections = ref([
   {
-    title: 'Today',
     chats: [
-      { id: 1, title: 'Vite Vue.js Setup', messages: [
-        { sender: 'User', content: 'How do I set up a new Vite Vue.js project?' },
-        { sender: 'ChatGPT', content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev' }
-      ]}
-    ]
-  },
-  {
-    title: 'Yesterday',
-    chats: [
-      { id: 2, title: 'Natural Hair Strengthening Tips', messages: [
-        { sender: 'User', content: 'What are some natural ways to strengthen hair?' },
-        { sender: 'ChatGPT', content: 'Here are some natural ways to strengthen your hair:\n1. Eat a balanced diet rich in proteins and vitamins\n2. Use coconut oil or olive oil treatments\n3. Avoid heat styling when possible\n4. Try an egg mask treatment\n5. Use a silk or satin pillowcase to reduce friction' }
-      ]},
-      { id: 3, title: 'Port Selection in IPC', messages: [
-        { sender: 'User', content: 'How do I select the right port for IPC communication?' },
-        { sender: 'ChatGPT', content: 'When selecting a port for IPC (Inter-Process Communication), consider these factors:\n1. Use ports above 1024 to avoid conflicts with system services\n2. Check if the port is already in use\n3. Consider using a configuration file to make the port number easily changeable\n4. Use well-known port ranges for your application type if applicable' }
-      ]}
-    ]
-  },
-  {
-    title: 'Previous 7 Days',
-    chats: [
-      { id: 4, title: 'Python Threading and Async', messages: [
-        { sender: 'User', content: 'What\'s the difference between threading and async in Python?' },
-        { sender: 'ChatGPT', content: 'Threading and async in Python are both used for concurrent programming, but they have key differences:\n1. Threading uses OS-level threads, while async uses a single-threaded event loop\n2. Threading is better for CPU-bound tasks, async for I/O-bound tasks\n3. Async requires special syntax (async/await), threading doesn\'t\n4. Async is generally more scalable for I/O-heavy applications\n5. Threading can lead to race conditions, while async is typically safer' }
-      ]},
-      { id: 5, title: 'OpenAI API Debugging', messages: [
-        { sender: 'User', content: 'How can I debug issues with the OpenAI API?' },
-        { sender: 'ChatGPT', content: 'To debug issues with the OpenAI API:\n1. Check your API key and ensure it\'s valid\n2. Verify your request format and parameters\n3. Use try/catch blocks to handle and log errors\n4. Check the API response for error messages\n5. Monitor your API usage and rate limits\n6. Use OpenAI\'s official documentation for reference\n7. Test with curl or Postman to isolate issues' }
-      ]}
+      { 
+        id: 1, 
+        title: 'Vite Vue.js Setup', 
+        timestamp: new Date(), 
+        messages: [
+          { 
+            sender: 'User', 
+            content: 'How do I set up a new Vite Vue.js project?',
+            timestamp: new Date()
+          },
+          { 
+            sender: 'ChatGPT', 
+            content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev',
+            timestamp: new Date()
+          }
+        ]
+      }
     ]
   }
 ])
@@ -175,21 +166,48 @@ const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
 
-const selectedChat = computed(() => {
-  return chatSections.value
-    .flatMap(section => section.chats)
-    .find(chat => chat.id === selectedChatId.value)
+const organizedChatSections = computed(() => {
+  const allChats = chatSections.value.flatMap(section => section.chats)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const weekAgo = new Date(today)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+
+  const sections = [
+    {
+      title: 'Today',
+      chats: allChats.filter(chat => chat.timestamp >= today)
+    },
+    {
+      title: 'Yesterday',
+      chats: allChats.filter(chat => chat.timestamp >= yesterday && chat.timestamp < today)
+    },
+    {
+      title: 'Previous 7 Days',
+      chats: allChats.filter(chat => chat.timestamp >= weekAgo && chat.timestamp < yesterday)
+    }
+  ]
+
+  return sections.filter(section => section.chats.length > 0)
 })
 
 const filteredChatSections = computed(() => {
-  if (!searchQuery.value) return chatSections.value
+  if (!searchQuery.value) return organizedChatSections.value
 
-  return chatSections.value.map(section => ({
+  return organizedChatSections.value.map(section => ({
     ...section,
     chats: section.chats.filter(chat => 
       chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
   })).filter(section => section.chats.length > 0)
+})
+
+const selectedChat = computed(() => {
+  return chatSections.value
+    .flatMap(section => section.chats)
+    .find(chat => chat.id === selectedChatId.value)
 })
 
 function selectChat(chatId) {
@@ -198,15 +216,18 @@ function selectChat(chatId) {
 
 function sendMessage() {
   if (newMessage.value.trim() && selectedChat.value) {
+    const now = new Date()
     selectedChat.value.messages.push({
       sender: 'User',
-      content: newMessage.value.trim()
+      content: newMessage.value.trim(),
+      timestamp: now
     })
     // Simulate a response from ChatGPT
     setTimeout(() => {
       selectedChat.value.messages.push({
         sender: 'ChatGPT',
-        content: `This is a simulated response to: "${newMessage.value.trim()}"`
+        content: `This is a simulated response to: "${newMessage.value.trim()}"`,
+        timestamp: new Date()
       })
     }, 1000)
     newMessage.value = ''
@@ -230,12 +251,21 @@ function filterChats() {
 
 function createNewChat() {
   const newChatId = Date.now()
+  const now = new Date()
   chatSections.value[0].chats.unshift({
     id: newChatId,
     title: 'New Chat',
+    timestamp: now,
     messages: []
   })
   selectChat(newChatId)
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return ''
+  
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
