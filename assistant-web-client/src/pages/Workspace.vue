@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-700 text-gray-100 flex">
+  <div class="h-full bg-gray-700 text-gray-100 flex">
     <!-- Sidebar -->
     <div 
       :class="[
@@ -255,6 +255,12 @@ function createNewChat() {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #6b7280;
+}
+
+/* Ensure the parent container fills the available height */
+html, body, #app {
+  height: 100%;
+  margin: 0;
 }
 </style>
 

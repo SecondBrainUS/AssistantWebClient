@@ -5,9 +5,9 @@ import { RouterLink, RouterView } from 'vue-router'
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col h-screen">
     <SBNavbar />
-    <router-view></router-view>
+    <router-view class="flex-1 overflow-auto"></router-view>
   </div>
 </template>
 
