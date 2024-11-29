@@ -1,5 +1,6 @@
 <script setup>
 import HelloWorld from './components/HelloWorld.vue'
+import { RouterLink, RouterView } from 'vue-router'
 </script>
 
 <template>
@@ -10,6 +11,10 @@ import HelloWorld from './components/HelloWorld.vue'
     <a href="https://vuejs.org/" target="_blank">
       <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
     </a>
+    <router-link to="/workspace">
+      <button>Go to Workspace</button>
+    </router-link>
+    <router-view></router-view>
   </div>
   <HelloWorld msg="Vite + Vue" />
 </template>
