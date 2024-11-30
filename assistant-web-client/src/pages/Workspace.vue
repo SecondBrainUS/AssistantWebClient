@@ -371,6 +371,9 @@ function selectModel(model) {
   isModelSelectorOpen.value = false
 }
 
+// Add a ref to store the WebSocket instance
+const websocket = ref(null)
+
 // Add click outside handler to close dropdown
 onMounted(() => {
   document.addEventListener('click', (e) => {
@@ -379,7 +382,67 @@ onMounted(() => {
       isModelSelectorOpen.value = false
     }
   })
+  initializeWebSocket()
 })
+
+// Add these new functions before initializeWebSocket()
+async function getAuthToken() {
+  try {
+    const response = await fetch('http://localhost:8000/api/v1/local/live/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: 'demo_user', // Replace with actual user credentials
+        password: 'demo_pass'
+      })
+    });
+    
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+}
+
+// Update the initializeWebSocket function
+async function initializeWebSocket() {
+  const token = await getAuthToken();
+  if (!token) {
+    console.error('Failed to get authentication token');
+    return;
+  }
+
+  websocket.value = new WebSocket(`ws://localhost:8000/api/v1/local/live/?token=${token}`);
+
+  websocket.value.onopen = () => {
+    console.log('WebSocket connection opened');
+  }
+
+  websocket.value.onmessage = (event) => {
+    const message = JSON.parse(event.data)
+    // Handle incoming message
+    console.log('Received message:', message)
+    // Example: Add message to the selected chat
+    if (selectedChat.value) {
+      selectedChat.value.messages.push({
+        role: 'system',
+        content: message.content,
+        timestamp: new Date()
+      })
+    }
+  }
+
+  websocket.value.onclose = () => {
+    console.log('WebSocket connection closed')
+  }
+
+  websocket.value.onerror = (error) => {
+    console.error('WebSocket error:', error)
+  }
+}
 </script>
 
 <style>
