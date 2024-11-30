@@ -60,23 +60,72 @@
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col">
+      <!-- Model selector -->
+      <div class="p-4 border-b border-gray-700">
+        <div class="relative max-w-xs ml-auto">
+          <button 
+            @click="isModelSelectorOpen = !isModelSelectorOpen"
+            class="flex items-center justify-between w-full px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <div class="flex items-center space-x-2">
+              <span class="text-sm">{{ selectedModel.name }}</span>
+            </div>
+            <ChevronDown class="h-4 w-4" :class="{ 'transform rotate-180': isModelSelectorOpen }" />
+          </button>
+
+          <!-- Dropdown menu -->
+          <div v-if="isModelSelectorOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50">
+            <div class="p-2 space-y-1">
+              <div v-for="model in models" :key="model.id" class="p-2">
+                <button 
+                  @click="selectModel(model)"
+                  class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
+                >
+                  <div class="text-sm font-medium">{{ model.name }}</div>
+                  <div class="text-xs text-gray-400">{{ model.description }}</div>
+                </button>
+              </div>
+              
+              <!-- Toggles -->
+              <div class="border-t border-gray-700 mt-2 pt-2 space-y-2">
+                <div v-for="toggle in toggles" :key="toggle.id" 
+                  class="flex items-center justify-between p-2 hover:bg-gray-700 rounded-lg"
+                >
+                  <span class="text-sm">{{ toggle.name }}</span>
+                  <button 
+                    @click="toggle.enabled = !toggle.enabled"
+                    class="w-10 h-5 relative rounded-full transition-colors duration-200 ease-in-out"
+                    :class="[toggle.enabled ? 'bg-green-500' : 'bg-gray-600']"
+                  >
+                    <span 
+                      class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out"
+                      :class="[toggle.enabled ? 'transform translate-x-5' : '']"
+                    ></span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Chat area -->
       <div class="flex-1 p-4 overflow-y-auto">
         <div v-if="selectedChat">
           <div v-for="(message, index) in selectedChat.messages" :key="index" class="mb-4">
             <div class="flex justify-between items-center mb-1">
-              <div class="font-semibold">{{ message.sender }}</div>
+              <div class="font-semibold">{{ message.role }}</div>
               <div class="text-xs text-gray-400">
                 {{ formatTimestamp(message.timestamp) }}
               </div>
             </div>
             <div :class="[
-              message.sender === 'User' ? 'bg-gray-600 p-3 rounded-lg' : ''
+              message.role === 'user' ? 'bg-gray-600 p-3 rounded-lg' : ''
             ]">{{ message.content }}</div>
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center">
-          <div class="text-3xl font-semibold text-gray-300">What can I help with?</div>
+          <div class="text-3xl font-semibold text-gray-300">What it do my man?</div>
         </div>
       </div>
 
@@ -88,7 +137,7 @@
               v-model="newMessage"
               rows="1"
               class="w-full bg-transparent p-4 pr-20 focus:outline-none resize-none"
-              placeholder="Message ChatGPT"
+              placeholder="Send a message "
               @keyup.enter="sendMessage"
             ></textarea>
             <button @click="sendMessage" class="absolute right-2 bottom-2 p-2 hover:bg-gray-700 rounded">
@@ -122,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   Menu, 
   Search, 
@@ -145,12 +194,12 @@ const chatSections = ref([
         timestamp: new Date(), 
         messages: [
           { 
-            sender: 'User', 
+            role: 'user', 
             content: 'How do I set up a new Vite Vue.js project?',
             timestamp: new Date()
           },
           { 
-            sender: 'ChatGPT', 
+            role: 'system', 
             content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev',
             timestamp: new Date()
           }
@@ -165,6 +214,55 @@ const newMessage = ref('')
 const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
+const isModelSelectorOpen = ref(false)
+
+const models = ref([
+  {
+    id: 1,
+    name: 'GPT-4',
+    description: 'Most capable model for complex tasks'
+  },
+  {
+    id: 2,
+    name: 'GPT-4 Turbo',
+    description: 'Faster version with latest knowledge'
+  },
+  {
+    id: 3,
+    name: 'GPT-3.5 Turbo',
+    description: 'Fast and efficient for most tasks'
+  },
+  {
+    id: 4,
+    name: 'Claude 2',
+    description: 'Advanced reasoning and analysis'
+  },
+  {
+    id: 5,
+    name: 'Claude Instant',
+    description: 'Quick responses for simple tasks'
+  }
+])
+
+const toggles = ref([
+  {
+    id: 1,
+    name: 'Temporary chat',
+    enabled: false
+  },
+  {
+    id: 2,
+    name: 'Web browsing',
+    enabled: false
+  },
+  {
+    id: 3,
+    name: 'Code interpreter',
+    enabled: false
+  }
+])
+
+const selectedModel = ref(models.value[0])
 
 const organizedChatSections = computed(() => {
   const allChats = chatSections.value.flatMap(section => section.chats)
@@ -218,14 +316,14 @@ function sendMessage() {
   if (newMessage.value.trim() && selectedChat.value) {
     const now = new Date()
     selectedChat.value.messages.push({
-      sender: 'User',
+      role: 'user',
       content: newMessage.value.trim(),
       timestamp: now
     })
-    // Simulate a response from ChatGPT
+    // Simulate a response
     setTimeout(() => {
       selectedChat.value.messages.push({
-        sender: 'ChatGPT',
+        role: 'system',
         content: `This is a simulated response to: "${newMessage.value.trim()}"`,
         timestamp: new Date()
       })
@@ -267,6 +365,21 @@ function formatTimestamp(timestamp) {
   const date = new Date(timestamp)
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+function selectModel(model) {
+  selectedModel.value = model
+  isModelSelectorOpen.value = false
+}
+
+// Add click outside handler to close dropdown
+onMounted(() => {
+  document.addEventListener('click', (e) => {
+    const dropdown = document.querySelector('.relative')
+    if (dropdown && !dropdown.contains(e.target)) {
+      isModelSelectorOpen.value = false
+    }
+  })
+})
 </script>
 
 <style>
