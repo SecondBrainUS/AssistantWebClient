@@ -12,4 +12,8 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true, // Enable sourcemaps for debugging
   },
+  server: {
+    host: true,
+    port: 3000,
+  },
 });
