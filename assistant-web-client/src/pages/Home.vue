@@ -35,24 +35,19 @@ export default {
 
 .glow {
   position: absolute;
-  width: 80vmin;
-  height: 80vmin;
+  width: 40vmax;
+  height: 40vmax;
   background: radial-gradient(
     circle,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(255, 255, 255, 0.7) 3%,
-    rgba(255, 255, 255, 0.5) 8%,
-    rgba(255, 255, 255, 0.3) 15%,
-    rgba(255, 255, 255, 0.15) 25%,
-    rgba(255, 255, 255, 0.08) 40%,
-    rgba(255, 255, 255, 0.03) 65%,
-    rgba(255, 255, 255, 0.01) 85%,
-    rgba(255, 255, 255, 0) 100%
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0) 70%
   );
   border-radius: 50%;
   animation: pulse 6s ease-in-out infinite;
   z-index: 0;
-  filter: blur(160px);
+  filter: blur(100px);
+  transform: translate(-50%, -50%);
+
 }
 
 .logo {

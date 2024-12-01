@@ -112,20 +112,38 @@
       <!-- Chat area -->
       <div class="flex-1 p-4 overflow-y-auto">
         <div v-if="selectedChat">
-          <div v-for="(message, index) in selectedChat.messages" :key="index" class="mb-4">
+          <div v-for="message in selectedChat.messages" 
+               :key="message.id" 
+               class="mb-4"
+          >
             <div class="flex justify-between items-center mb-1">
               <div class="font-semibold">{{ message.role }}</div>
-              <div class="text-xs text-gray-400">
-                {{ formatTimestamp(message.timestamp) }}
+              <div class="flex items-center space-x-2">
+                <div class="text-xs text-gray-400">
+                  {{ formatTimestamp(message.timestamp) }}
+                </div>
+                <!-- Message status indicator -->
+                <div v-if="message.role === 'user'" class="text-xs">
+                  <template v-if="messageStatuses.get(message.id) === 'sending'">
+                    <span class="text-yellow-500">Sending...</span>
+                  </template>
+                  <template v-else-if="messageStatuses.get(message.id) === 'sent'">
+                    <span class="text-green-500">✓</span>
+                  </template>
+                  <template v-else-if="messageStatuses.get(message.id) === 'error'">
+                    <span class="text-red-500">Failed to send</span>
+                  </template>
+                </div>
               </div>
             </div>
             <div :class="[
-              message.role === 'user' ? 'bg-gray-600 p-3 rounded-lg' : ''
+              'p-3 rounded-lg',
+              message.role === 'user' ? 'bg-gray-600' : 'bg-gray-700'
             ]">{{ message.content }}</div>
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center">
-          <div class="text-3xl font-semibold text-gray-300">What it do my man?</div>
+          <div class="text-3xl font-semibold text-gray-300">Start a new chat!</div>
         </div>
       </div>
 
@@ -171,51 +189,27 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+// 1. Imports
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { 
-  Menu, 
-  Search, 
-  PenSquare, 
-  MessageSquare, 
-  ChevronDown,
-  Send,
-  Image,
-  PenLine,
-  HelpCircle,
-  FileText
+  Menu, Search, PenSquare, MessageSquare, ChevronDown,
+  Send, Image, PenLine, HelpCircle, FileText
 } from 'lucide-vue-next'
+import SocketClient from '../utils/socketClient'
 
-const chatSections = ref([
-  {
-    chats: [
-      { 
-        id: 1, 
-        title: 'Vite Vue.js Setup', 
-        timestamp: new Date(), 
-        messages: [
-          { 
-            role: 'user', 
-            content: 'How do I set up a new Vite Vue.js project?',
-            timestamp: new Date()
-          },
-          { 
-            role: 'system', 
-            content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev',
-            timestamp: new Date()
-          }
-        ]
-      }
-    ]
-  }
-])
-
+// 2. State Management
+const socketClient = ref(null)
+const roomName = ref('user123-workspace-13212')
 const selectedChatId = ref(null)
 const newMessage = ref('')
 const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
 const isModelSelectorOpen = ref(false)
+const websocket = ref(null)
+const messageStatuses = ref(new Map())
 
+// 3. Data Definitions
 const models = ref([
   {
     id: 1,
@@ -244,6 +238,8 @@ const models = ref([
   }
 ])
 
+const selectedModel = ref(models.value[0])
+
 const toggles = ref([
   {
     id: 1,
@@ -262,8 +258,31 @@ const toggles = ref([
   }
 ])
 
-const selectedModel = ref(models.value[0])
+const chatSections = ref([
+  {
+    chats: [
+      { 
+        id: 1, 
+        title: 'Vite Vue.js Setup', 
+        timestamp: new Date(), 
+        messages: [
+          { 
+            role: 'user', 
+            content: 'How do I set up a new Vite Vue.js project?',
+            timestamp: new Date()
+          },
+          { 
+            role: 'system', 
+            content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev',
+            timestamp: new Date()
+          }
+        ]
+      }
+    ]
+  }
+])
 
+// 4. Computed Properties
 const organizedChatSections = computed(() => {
   const allChats = chatSections.value.flatMap(section => section.chats)
   const now = new Date()
@@ -308,84 +327,7 @@ const selectedChat = computed(() => {
     .find(chat => chat.id === selectedChatId.value)
 })
 
-function selectChat(chatId) {
-  selectedChatId.value = chatId
-}
-
-function sendMessage() {
-  if (newMessage.value.trim() && selectedChat.value) {
-    const now = new Date()
-    selectedChat.value.messages.push({
-      role: 'user',
-      content: newMessage.value.trim(),
-      timestamp: now
-    })
-    // Simulate a response
-    setTimeout(() => {
-      selectedChat.value.messages.push({
-        role: 'system',
-        content: `This is a simulated response to: "${newMessage.value.trim()}"`,
-        timestamp: new Date()
-      })
-    }, 1000)
-    newMessage.value = ''
-  }
-}
-
-function toggleSidebar() {
-  isSidebarOpen.value = !isSidebarOpen.value
-  if (!isSidebarOpen.value) {
-    isSearchOpen.value = false
-  }
-}
-
-function toggleSearch() {
-  isSearchOpen.value = !isSearchOpen.value
-}
-
-function filterChats() {
-  // Filtering is handled by the computed property filteredChatSections
-}
-
-function createNewChat() {
-  const newChatId = Date.now()
-  const now = new Date()
-  chatSections.value[0].chats.unshift({
-    id: newChatId,
-    title: 'New Chat',
-    timestamp: now,
-    messages: []
-  })
-  selectChat(newChatId)
-}
-
-function formatTimestamp(timestamp) {
-  if (!timestamp) return ''
-  
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function selectModel(model) {
-  selectedModel.value = model
-  isModelSelectorOpen.value = false
-}
-
-// Add a ref to store the WebSocket instance
-const websocket = ref(null)
-
-// Add click outside handler to close dropdown
-onMounted(() => {
-  document.addEventListener('click', (e) => {
-    const dropdown = document.querySelector('.relative')
-    if (dropdown && !dropdown.contains(e.target)) {
-      isModelSelectorOpen.value = false
-    }
-  })
-  initializeWebSocket()
-})
-
-// Add these new functions before initializeWebSocket()
+// 5. Authentication Functions
 async function getAuthToken() {
   try {
     const response = await fetch('http://localhost:8000/api/v1/local/live/token', {
@@ -407,42 +349,222 @@ async function getAuthToken() {
   }
 }
 
-// Update the initializeWebSocket function
+// 6. WebSocket Functions
 async function initializeWebSocket() {
-  const token = await getAuthToken();
-  if (!token) {
-    console.error('Failed to get authentication token');
-    return;
-  }
-
-  websocket.value = new WebSocket(`ws://localhost:8000/api/v1/local/live/?token=${token}`);
-
-  websocket.value.onopen = () => {
-    console.log('WebSocket connection opened');
-  }
-
-  websocket.value.onmessage = (event) => {
-    const message = JSON.parse(event.data)
-    // Handle incoming message
-    console.log('Received message:', message)
-    // Example: Add message to the selected chat
-    if (selectedChat.value) {
-      selectedChat.value.messages.push({
-        role: 'system',
-        content: message.content,
-        timestamp: new Date()
-      })
+  console.log("Starting WebSocket initialization")
+  try {
+    const token = await getAuthToken()
+    if (!token) {
+      console.error('Failed to get authentication token')
+      return
     }
-  }
 
-  websocket.value.onclose = () => {
-    console.log('WebSocket connection closed')
-  }
+    socketClient.value = new SocketClient('http://localhost:8000', {
+      auth: { 
+        token,
+        user_id: 'testtest'
+      },
+      namespace: '/assistant/realtime',
+      autoConnect: false,
+      timeout: 10000,
+    })
 
-  websocket.value.onerror = (error) => {
-    console.error('WebSocket error:', error)
+    await socketClient.value.connect()
+
+    // Handle incoming messages
+    socketClient.value.onMessage((data) => {
+      console.log("Received message:", data)
+      if (selectedChat.value && data.room_id === selectedChat.value.id) {
+        // Handle conversation.item.created event
+        if (data.event_type === 'conversation.item.created') {
+          // Add the message to the UI
+          selectedChat.value.messages.push({
+            id: data.data.id,
+            role: data.data.role,
+            content: data.data.content[0].text, // Assuming text content
+            timestamp: new Date()
+          })
+
+          // Request AI response
+          socketClient.value?.sendMessage(selectedChat.value.id, {
+            event_type: 'response.create',
+            data: {
+              response: {
+                modalities: ['text', 'audio'],
+                temperature: 0.7,
+                max_output_tokens: 1500
+              }
+            }
+          })
+        }
+        
+        // Scroll to bottom on new message
+        nextTick(() => {
+          const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
+          if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
+        })
+      }
+    })
+
+    // Handle room events
+    socketClient.value.onRoomCreated((data) => {
+      console.log("Room created:", data)
+    })
+
+    socketClient.value.onRoomJoined((data) => {
+      console.log("Joined room:", data)
+    })
+
+    socketClient.value.onRoomError((data) => {
+      console.error("Room error:", data)
+      // TODO: Show error notification to user
+    })
+
+  } catch (error) {
+    console.error("Failed to initialize WebSocket:", error)
   }
 }
+
+// 7. UI Event Handlers
+function selectChat(chatId) {
+  selectedChatId.value = chatId
+}
+
+async function sendMessage() {
+  if (!newMessage.value.trim() || !selectedChat.value) return
+
+  const messageId = Date.now().toString()
+  const now = new Date()
+  const messageContent = newMessage.value.trim()
+  
+  try {
+    // Add message to UI immediately with pending status
+    messageStatuses.value.set(messageId, 'sending')
+    selectedChat.value.messages.push({
+      id: messageId,
+      role: 'user',
+      content: messageContent,
+      timestamp: now
+    })
+    
+    newMessage.value = ''
+    await nextTick()
+    const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
+    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
+
+    // Send message in OpenAI format
+    await socketClient.value?.sendMessage(selectedChat.value.id, {
+      type: 'conversation.item.create',
+      data: {
+        item: {
+          id: messageId,
+          type: 'message',
+          role: 'user',
+          content: [{
+            type: 'input_text',
+            text: messageContent
+          }]
+        }
+      }
+    })
+
+    // Request AI response
+    await socketClient.value?.sendMessage(selectedChat.value.id, {
+      type: 'response.create',
+      data: {
+        response: {
+          modalities: ['text', 'audio'],
+          temperature: 0.7,
+          max_output_tokens: 1500
+        }
+      }
+    })
+    
+    messageStatuses.value.set(messageId, 'sent')
+  } catch (error) {
+    console.error("Error sending message:", error)
+    messageStatuses.value.set(messageId, 'error')
+  }
+}
+
+function toggleSidebar() {
+  isSidebarOpen.value = !isSidebarOpen.value
+  if (!isSidebarOpen.value) {
+    isSearchOpen.value = false
+  }
+}
+
+function toggleSearch() {
+  isSearchOpen.value = !isSearchOpen.value
+}
+
+function filterChats() {
+  // Filtering is handled by computed property
+}
+
+async function createNewChat() {
+  const newChatId = Date.now().toString()
+  const now = new Date()
+  
+  try {
+    // Create the chat in UI first
+    chatSections.value[0].chats.unshift({
+      id: newChatId,
+      title: 'New Chat',
+      timestamp: now,
+      messages: []
+    })
+    selectChat(newChatId)
+
+    // Create room in socket server
+    if (socketClient.value) {
+      console.log("Creating room for new chat:", newChatId)
+      // Wait for room creation confirmation before joining
+      await socketClient.value.createRoom(newChatId)
+      console.log("Room creation confirmed")
+      await socketClient.value.joinRoom(newChatId)
+      console.log("Room joined successfully")
+    }
+  } catch (error) {
+    console.error("Failed to create chat room:", error)
+    // Remove the chat if room creation failed
+    chatSections.value[0].chats = chatSections.value[0].chats.filter(
+      chat => chat.id !== newChatId
+    )
+    // TODO: Show error notification to user
+  }
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return ''
+  
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function selectModel(model) {
+  selectedModel.value = model
+  isModelSelectorOpen.value = false
+}
+
+// 8. Lifecycle Hooks
+onMounted(() => {
+  // Click outside handler
+  document.addEventListener('click', (e) => {
+    const dropdown = document.querySelector('.relative')
+    if (dropdown && !dropdown.contains(e.target)) {
+      isModelSelectorOpen.value = false
+    }
+  })
+  
+  initializeWebSocket()
+})
+
+onUnmounted(() => {
+  if (socketClient.value) {
+    socketClient.value.disconnect()
+  }
+})
 </script>
 
 <style>
