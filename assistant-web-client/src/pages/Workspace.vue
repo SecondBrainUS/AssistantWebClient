@@ -208,6 +208,8 @@ const searchQuery = ref('')
 const isModelSelectorOpen = ref(false)
 const websocket = ref(null)
 const messageStatuses = ref(new Map())
+const currentAssistantMessage = ref(null)
+const audioContext = ref(null)
 
 // 3. Data Definitions
 const models = ref([
@@ -375,34 +377,52 @@ async function initializeWebSocket() {
     socketClient.value.onMessage((data) => {
       console.log("Received message:", data)
       if (selectedChat.value && data.room_id === selectedChat.value.id) {
-        // Handle conversation.item.created event
-        if (data.event_type === 'conversation.item.created') {
-          // Add the message to the UI
-          selectedChat.value.messages.push({
-            id: data.data.id,
-            role: data.data.role,
-            content: data.data.content[0].text, // Assuming text content
-            timestamp: new Date()
-          })
+        try {
+          const eventData = JSON.parse(data.message)
+          
+          switch (eventData.type) {
+            case 'response.audio.delta':
+              // Handle incoming audio chunk
+              playAudioBuffer(eventData.delta)
+              break
 
-          // Request AI response
-          socketClient.value?.sendMessage(selectedChat.value.id, {
-            event_type: 'response.create',
-            data: {
-              response: {
-                modalities: ['text', 'audio'],
-                temperature: 0.7,
-                max_output_tokens: 1500
+            case 'response.audio_transcript.delta':
+              // If this is the first chunk of the response, create a new message
+              if (!currentAssistantMessage.value) {
+                currentAssistantMessage.value = {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: eventData.delta,
+                  timestamp: new Date()
+                }
+                selectedChat.value.messages.push(currentAssistantMessage.value)
+              } else {
+                // Append to existing message
+                currentAssistantMessage.value.content += eventData.delta
               }
-            }
+              break
+
+            case 'response.audio_transcript.done':
+              // Finalize the message
+              if (currentAssistantMessage.value) {
+                currentAssistantMessage.value = null // Reset for next message
+              }
+              break
+
+            case 'response.done':
+              // Reset everything for the next interaction
+              currentAssistantMessage.value = null
+              break
+          }
+
+          // Scroll to bottom on new content
+          nextTick(() => {
+            const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
+            if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
           })
+        } catch (error) {
+          console.error('Error processing message:', error)
         }
-        
-        // Scroll to bottom on new message
-        nextTick(() => {
-          const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
-          if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
-        })
       }
     })
 
@@ -565,6 +585,54 @@ onUnmounted(() => {
     socketClient.value.disconnect()
   }
 })
+
+// Add this method to handle audio playback
+function playAudioBuffer(base64Audio) {
+  try {
+    if (!audioContext.value) {
+      audioContext.value = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Get the actual sample rate of the audio context
+    const contextSampleRate = audioContext.value.sampleRate;
+    const inputSampleRate = 24000;
+    
+    // Decode base64 to binary data
+    const binaryString = atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // Calculate samples for input and output
+    const inputSamples = Math.floor(bytes.length / 2);
+    const outputSamples = Math.floor(inputSamples * contextSampleRate / inputSampleRate);
+    
+    // Create audio buffer at the context's sample rate
+    const audioBuffer = audioContext.value.createBuffer(1, outputSamples, contextSampleRate);
+    const channelData = audioBuffer.getChannelData(0);
+
+    // Convert and resample PCM16 to float32
+    const dataView = new DataView(bytes.buffer);
+    for (let i = 0; i < outputSamples; i++) {
+      // Map the output sample index back to input sample index
+      const inputIndex = Math.floor(i * inputSampleRate / contextSampleRate);
+      if (inputIndex < inputSamples) {
+        const pcm16 = dataView.getInt16(inputIndex * 2, true);
+        channelData[i] = Math.max(-1, Math.min(1, pcm16 / 32768.0));
+      }
+    }
+
+    // Play the audio
+    const source = audioContext.value.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.value.destination);
+    source.playbackRate.value = 1.0; // Ensure normal playback rate
+    source.start(0);
+  } catch (error) {
+    console.error('Error processing audio:', error);
+  }
+}
 </script>
 
 <style>
