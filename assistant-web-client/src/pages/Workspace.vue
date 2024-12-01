@@ -210,6 +210,10 @@ const websocket = ref(null)
 const messageStatuses = ref(new Map())
 const currentAssistantMessage = ref(null)
 const audioContext = ref(null)
+const audioQueue = ref([])
+const isPlaying = ref(false)
+const currentSource = ref(null)
+const nextPlayTime = ref(0)
 
 // 3. Data Definitions
 const models = ref([
@@ -584,53 +588,101 @@ onUnmounted(() => {
   if (socketClient.value) {
     socketClient.value.disconnect()
   }
+  if (currentSource.value) {
+    currentSource.value.stop();
+  }
+  if (audioContext.value) {
+    audioContext.value.close();
+  }
 })
 
 // Add this method to handle audio playback
+function processAudioQueue() {
+  if (!isPlaying.value && audioQueue.value.length > 0) {
+    isPlaying.value = true;
+    
+    const playNextChunk = () => {
+      if (audioQueue.value.length === 0) {
+        isPlaying.value = false;
+        return;
+      }
+
+      try {
+        const base64Audio = audioQueue.value.shift();
+        
+        // Decode base64 to binary data
+        const binaryString = atob(base64Audio);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+
+        const inputSamples = Math.floor(bytes.length / 2);
+        const outputSamples = Math.floor(inputSamples * 48000 / 24000);
+        const audioBuffer = audioContext.value.createBuffer(1, outputSamples, 48000);
+        const channelData = audioBuffer.getChannelData(0);
+
+        // Convert PCM16 to float32 with linear interpolation
+        const dataView = new DataView(bytes.buffer);
+        for (let i = 0; i < outputSamples; i++) {
+          const inputPos = i * 24000 / 48000;
+          const inputIndex = Math.floor(inputPos);
+          const fraction = inputPos - inputIndex;
+
+          const pcm16A = dataView.getInt16(inputIndex * 2, true);
+          const pcm16B = inputIndex < inputSamples - 1 ? 
+                        dataView.getInt16((inputIndex + 1) * 2, true) : 
+                        pcm16A;
+
+          const sampleA = pcm16A / 32768.0;
+          const sampleB = pcm16B / 32768.0;
+          channelData[i] = Math.max(-1, Math.min(1, 
+            sampleA + fraction * (sampleB - sampleA)
+          ));
+        }
+
+        // Calculate precise timing
+        const duration = outputSamples / 48000; // Duration in seconds
+        if (nextPlayTime.value < audioContext.value.currentTime) {
+          nextPlayTime.value = audioContext.value.currentTime;
+        }
+
+        // Create and schedule the source
+        const source = audioContext.value.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.value.destination);
+        source.start(nextPlayTime.value);
+        currentSource.value = source;
+
+        // Schedule next chunk
+        nextPlayTime.value += duration;
+        source.onended = () => {
+          currentSource.value = null;
+          playNextChunk();
+        };
+
+      } catch (error) {
+        console.error('Error processing audio chunk:', error);
+        playNextChunk(); // Skip problematic chunk
+      }
+    };
+
+    playNextChunk();
+  }
+}
+
 function playAudioBuffer(base64Audio) {
   try {
     if (!audioContext.value) {
       audioContext.value = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    // Get the actual sample rate of the audio context
-    const contextSampleRate = audioContext.value.sampleRate;
-    const inputSampleRate = 24000;
-    
-    // Decode base64 to binary data
-    const binaryString = atob(base64Audio);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+    // Add to queue and process
+    audioQueue.value.push(base64Audio);
+    processAudioQueue();
 
-    // Calculate samples for input and output
-    const inputSamples = Math.floor(bytes.length / 2);
-    const outputSamples = Math.floor(inputSamples * contextSampleRate / inputSampleRate);
-    
-    // Create audio buffer at the context's sample rate
-    const audioBuffer = audioContext.value.createBuffer(1, outputSamples, contextSampleRate);
-    const channelData = audioBuffer.getChannelData(0);
-
-    // Convert and resample PCM16 to float32
-    const dataView = new DataView(bytes.buffer);
-    for (let i = 0; i < outputSamples; i++) {
-      // Map the output sample index back to input sample index
-      const inputIndex = Math.floor(i * inputSampleRate / contextSampleRate);
-      if (inputIndex < inputSamples) {
-        const pcm16 = dataView.getInt16(inputIndex * 2, true);
-        channelData[i] = Math.max(-1, Math.min(1, pcm16 / 32768.0));
-      }
-    }
-
-    // Play the audio
-    const source = audioContext.value.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.value.destination);
-    source.playbackRate.value = 1.0; // Ensure normal playback rate
-    source.start(0);
   } catch (error) {
-    console.error('Error processing audio:', error);
+    console.error('Error queueing audio:', error);
   }
 }
 </script>
