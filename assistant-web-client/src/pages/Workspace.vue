@@ -711,14 +711,16 @@ async function startRecording() {
     });
 
     if (!audioContext.value) {
-      audioContext.value = new (window.AudioContext || window.webkitAudioContext)();
+      audioContext.value = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 24000  // Match OpenAI's expected sample rate
+      });
     }
 
-    // Get microphone access
+    // Get microphone access with specific constraints
     micStream.value = await navigator.mediaDevices.getUserMedia({
       audio: {
-        channelCount: 1,
-        sampleRate: 16000,
+        channelCount: 1,          // Mono audio
+        sampleRate: 24000,        // Match OpenAI's sample rate
         echoCancellation: true,
         noiseSuppression: true
       }
@@ -728,13 +730,9 @@ async function startRecording() {
     const source = audioContext.value.createMediaStreamSource(micStream.value);
     audioProcessor.value = audioContext.value.createScriptProcessor(4096, 1, 1);
     
-    let audioChunks = [];
-    
     audioProcessor.value.onaudioprocess = async (e) => {
       try {
         const inputData = e.inputBuffer.getChannelData(0);
-        console.log('Audio chunk size:', inputData.length);
-        console.log('Audio data range:', Math.min(...inputData), Math.max(...inputData));
         
         // Skip silent audio
         const isAudible = inputData.some(sample => Math.abs(sample) > 0.01);
@@ -743,24 +741,9 @@ async function startRecording() {
           return;
         }
 
-        // Convert Float32Array to base64 PCM16
-        const buffer = new ArrayBuffer(inputData.length * 2);
-        const view = new DataView(buffer);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-        }
+        // Convert Float32Array to base64 PCM16 using proper encoding
+        const base64Audio = floatTo16BitPCMBase64(inputData);
         
-        // Convert to base64
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const chunkSize = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-          binary += String.fromCharCode.apply(null, chunk);
-        }
-        const base64Audio = btoa(binary);
-
         // Send properly structured message
         if (socketClient.value && selectedChat.value?.id) {
           const message = {
@@ -769,12 +752,6 @@ async function startRecording() {
             audio: base64Audio
           };
           
-          console.log('Sending audio chunk:', {
-            messageType: message.type,
-            audioLength: base64Audio.length,
-            eventId: message.event_id
-          });
-
           await socketClient.value.sendMessage(selectedChat.value.id, message);
         }
       } catch (error) {
@@ -793,37 +770,71 @@ async function startRecording() {
   }
 }
 
+// Helper function to convert Float32Array to base64 PCM16
+function floatTo16BitPCMBase64(float32Array) {
+  // First convert to PCM16
+  const buffer = new ArrayBuffer(float32Array.length * 2);
+  const view = new DataView(buffer);
+  
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  
+  // Then convert to base64 in chunks
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB chunks
+  
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  
+  return btoa(binary);
+}
+
 async function stopRecording() {
+  console.log('Stop recording called');
   try {
-    if (isProcessing.value) {
-      console.log('Already processing a request, please wait...');
+    if (!isRecording.value) {
+      console.log('Not recording, returning early');
       return;
     }
-
+    
     isProcessing.value = true;
+    console.log('Setting processing state');
 
     // Stop recording
     if (audioProcessor.value) {
+      console.log('Disconnecting audio processor');
       audioProcessor.value.disconnect();
       audioProcessor.value = null;
     }
 
     if (micStream.value) {
+      console.log('Stopping mic stream');
       micStream.value.getTracks().forEach(track => track.stop());
       micStream.value = null;
     }
 
-    isRecording.value = false;
-
-    // Send properly structured messages
-    if (socketClient.value && selectedChat.value?.id) {
-      // Commit the audio buffer
+    // Send final messages in correct sequence
+    if (socketClient.value?.isConnected && selectedChat.value?.id) {
+      console.log('Socket state:', {
+        connected: socketClient.value.isConnected,
+        socketExists: !!socketClient.value,
+        chatId: selectedChat.value?.id
+      });
+      
+      console.log('Sending commit message');
+      // First commit the audio buffer
       await socketClient.value.sendMessage(selectedChat.value.id, {
         type: 'input_audio_buffer.commit',
         event_id: `event_${Date.now()}`
       });
 
-      // Request response
+      console.log('Sending response.create message');
+      // Then request a response
       await socketClient.value.sendMessage(selectedChat.value.id, {
         type: 'response.create',
         event_id: `event_${Date.now()}`,
@@ -835,18 +846,19 @@ async function stopRecording() {
           }
         }
       });
+    } else {
+      console.error('Socket not connected or chat not selected', {
+        connected: socketClient.value?.isConnected,
+        chatId: selectedChat.value?.id,
+        socketExists: !!socketClient.value
+      });
     }
 
   } catch (error) {
     console.error('Error stopping recording:', error);
-    // Clear buffer on error
-    if (socketClient.value && selectedChat.value?.id) {
-      await socketClient.value.sendMessage(selectedChat.value.id, {
-        type: 'input_audio_buffer.clear',
-        event_id: `event_${Date.now()}`
-      });
-    }
   } finally {
+    console.log('Cleaning up recording state');
+    isRecording.value = false;
     isProcessing.value = false;
   }
 }
