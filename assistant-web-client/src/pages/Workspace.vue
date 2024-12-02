@@ -143,7 +143,7 @@
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center">
-          <div class="text-3xl font-semibold text-gray-300">Start a new chat!</div>
+          <div class="text-3xl font-semibold text-gray-300">{{ startingMessage}}</div>
         </div>
       </div>
 
@@ -162,11 +162,16 @@
               <Send class="h-5 w-5" />
             </button>
             <button 
-              @click="isRecording ? stopRecording() : startRecording()"
-              class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
-            </button>
+                @click="isRecording ? stopRecording() : startRecording()" 
+                class="p-2 rounded-lg flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-white"
+              >
+                <template v-if="isRecording">
+                  <Square class="h-6 w-6 text-red-500" />
+                </template>
+                <template v-else>
+                  <Mic class="h-6 w-6 text-white" />
+                </template>
+              </button>
           </div>
 
           <!-- Action buttons -->
@@ -199,7 +204,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { 
   Menu, Search, PenSquare, MessageSquare, ChevronDown,
-  Send, Image, PenLine, HelpCircle, FileText
+  Send, Image, PenLine, HelpCircle, FileText, Mic, Square
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
 
@@ -225,6 +230,13 @@ const isRecording = ref(false);
 const audioProcessor = ref(null);
 const micStream = ref(null);
 const isProcessing = ref(false);
+const startingMessage = ref('Start a new chat!');
+const quote = ref([
+  '"This has pulp", "You like pulp!", "I LIKE SOME PULP!" - Tony and Carmella',
+    'I was trying to say something positive cause she\'s your friend'
+  ][Math.floor(Math.random() * 2)]
+);
+// TODO: load this from your notion quote database
 
 // 3. Data Definitions
 const models = ref([
