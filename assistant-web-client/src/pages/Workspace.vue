@@ -743,6 +743,15 @@ async function startRecording() {
       return;
     }
 
+    // Check if microphone access is already granted
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const hasMicAccess = devices.some(device => device.kind === 'audioinput' && device.label);
+
+    if (!hasMicAccess) {
+      // Request microphone access
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+
     // Clear any existing audio buffer before starting
     await socketClient.value?.sendMessage(selectedChat.value.id, {
       type: 'input_audio_buffer.clear'
