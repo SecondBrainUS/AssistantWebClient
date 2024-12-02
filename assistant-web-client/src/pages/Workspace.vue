@@ -150,28 +150,33 @@
       <!-- Input area -->
       <div class="p-4 border-t border-gray-700">
         <div class="max-w-3xl mx-auto">
-          <div class="relative bg-gray-800 rounded-lg">
+          <div class="relative bg-gray-800 rounded-lg flex items-center">
             <textarea
               v-model="newMessage"
               rows="1"
               class="w-full bg-transparent p-4 pr-20 focus:outline-none resize-none"
-              placeholder="Send a message "
+              placeholder="Send a message"
               @keyup.enter="sendMessage"
             ></textarea>
-            <button @click="sendMessage" class="absolute right-2 bottom-2 p-2 hover:bg-gray-700 rounded">
-              <Send class="h-5 w-5" />
-            </button>
+            <!-- Send Button -->
             <button 
-                @click="isRecording ? stopRecording() : startRecording()" 
-                class="p-2 rounded-lg flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-white"
-              >
-                <template v-if="isRecording">
-                  <Square class="h-6 w-6 text-red-500" />
-                </template>
-                <template v-else>
-                  <Mic class="h-6 w-6 text-white" />
-                </template>
-              </button>
+              @click="sendMessage" 
+              class="p-2 mr-1 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
+            >
+              <Send class="h-6 w-6" />
+            </button>
+            <!-- Record Button -->
+            <button 
+              @click="isRecording ? stopRecording() : startRecording()" 
+              class="p-2 mr-2 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
+            >
+              <template v-if="isRecording">
+                <Square class="h-6 w-6 text-red-500" />
+              </template>
+              <template v-else>
+                <Mic class="h-6 w-6 text-white" />
+              </template>
+            </button>
           </div>
 
           <!-- Action buttons -->
