@@ -161,6 +161,12 @@
             <button @click="sendMessage" class="absolute right-2 bottom-2 p-2 hover:bg-gray-700 rounded">
               <Send class="h-5 w-5" />
             </button>
+            <button 
+              @click="isRecording ? stopRecording() : startRecording()"
+              class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {{ isRecording ? 'Stop Recording' : 'Start Recording' }}
+            </button>
           </div>
 
           <!-- Action buttons -->
@@ -214,6 +220,11 @@ const audioQueue = ref([])
 const isPlaying = ref(false)
 const currentSource = ref(null)
 const nextPlayTime = ref(0)
+const mediaRecorder = ref(null);
+const isRecording = ref(false);
+const audioProcessor = ref(null);
+const micStream = ref(null);
+const isProcessing = ref(false);
 
 // 3. Data Definitions
 const models = ref([
@@ -499,7 +510,7 @@ async function sendMessage() {
         response: {
           modalities: ['text', 'audio'],
           temperature: 0.7,
-          max_output_tokens: 1500
+          max_output_tokens: 1500,
         }
       }
     })
@@ -683,6 +694,160 @@ function playAudioBuffer(base64Audio) {
 
   } catch (error) {
     console.error('Error queueing audio:', error);
+  }
+}
+
+// Add these methods for microphone handling
+async function startRecording() {
+  try {
+    if (isProcessing.value) {
+      console.log('Already processing a request, please wait...');
+      return;
+    }
+
+    // Clear any existing audio buffer before starting
+    await socketClient.value?.sendMessage(selectedChat.value.id, {
+      type: 'input_audio_buffer.clear'
+    });
+
+    if (!audioContext.value) {
+      audioContext.value = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    // Get microphone access
+    micStream.value = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true
+      }
+    });
+
+    // Create audio processing pipeline
+    const source = audioContext.value.createMediaStreamSource(micStream.value);
+    audioProcessor.value = audioContext.value.createScriptProcessor(4096, 1, 1);
+    
+    let audioChunks = [];
+    
+    audioProcessor.value.onaudioprocess = async (e) => {
+      try {
+        const inputData = e.inputBuffer.getChannelData(0);
+        console.log('Audio chunk size:', inputData.length);
+        console.log('Audio data range:', Math.min(...inputData), Math.max(...inputData));
+        
+        // Skip silent audio
+        const isAudible = inputData.some(sample => Math.abs(sample) > 0.01);
+        if (!isAudible) {
+          console.log('Skipping silent audio chunk');
+          return;
+        }
+
+        // Convert Float32Array to base64 PCM16
+        const buffer = new ArrayBuffer(inputData.length * 2);
+        const view = new DataView(buffer);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        }
+        
+        // Convert to base64
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+          binary += String.fromCharCode.apply(null, chunk);
+        }
+        const base64Audio = btoa(binary);
+
+        // Send properly structured message
+        if (socketClient.value && selectedChat.value?.id) {
+          const message = {
+            type: 'input_audio_buffer.append',
+            event_id: `event_${Date.now()}`,
+            audio: base64Audio
+          };
+          
+          console.log('Sending audio chunk:', {
+            messageType: message.type,
+            audioLength: base64Audio.length,
+            eventId: message.event_id
+          });
+
+          await socketClient.value.sendMessage(selectedChat.value.id, message);
+        }
+      } catch (error) {
+        console.error('Error processing audio chunk:', error);
+      }
+    };
+
+    // Connect the audio nodes
+    source.connect(audioProcessor.value);
+    audioProcessor.value.connect(audioContext.value.destination);
+    
+    isRecording.value = true;
+
+  } catch (error) {
+    console.error('Error starting recording:', error);
+  }
+}
+
+async function stopRecording() {
+  try {
+    if (isProcessing.value) {
+      console.log('Already processing a request, please wait...');
+      return;
+    }
+
+    isProcessing.value = true;
+
+    // Stop recording
+    if (audioProcessor.value) {
+      audioProcessor.value.disconnect();
+      audioProcessor.value = null;
+    }
+
+    if (micStream.value) {
+      micStream.value.getTracks().forEach(track => track.stop());
+      micStream.value = null;
+    }
+
+    isRecording.value = false;
+
+    // Send properly structured messages
+    if (socketClient.value && selectedChat.value?.id) {
+      // Commit the audio buffer
+      await socketClient.value.sendMessage(selectedChat.value.id, {
+        type: 'input_audio_buffer.commit',
+        event_id: `event_${Date.now()}`
+      });
+
+      // Request response
+      await socketClient.value.sendMessage(selectedChat.value.id, {
+        type: 'response.create',
+        event_id: `event_${Date.now()}`,
+        data: {
+          response: {
+            modalities: ['text', 'audio'],
+            temperature: 0.7,
+            max_output_tokens: 1500
+          }
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error stopping recording:', error);
+    // Clear buffer on error
+    if (socketClient.value && selectedChat.value?.id) {
+      await socketClient.value.sendMessage(selectedChat.value.id, {
+        type: 'input_audio_buffer.clear',
+        event_id: `event_${Date.now()}`
+      });
+    }
+  } finally {
+    isProcessing.value = false;
   }
 }
 </script>
