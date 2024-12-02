@@ -1,13 +1,27 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-const routes = [
-  { path: '/', component: () => import('@/pages/Home.vue') },
-  { path: '/workspace', component: () => import('@/pages/Workspace.vue') },
-];
-
 const router = createRouter({
   history: createWebHistory(),
-  routes,
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: () => import('@/pages/Home.vue'),
+      meta: { transition: 'fade' }
+    },
+    {
+      path: '/workspace',
+      name: 'workspace',
+      component: () => import('@/pages/Workspace.vue'),
+      meta: { transition: 'slide' }
+    }
+  ]
+});
+
+router.beforeEach((to, from, next) => {
+  to.meta.previousPath = from.path
+  to.meta.previousTransition = from.meta.transition
+  next()
 });
 
 export default router;

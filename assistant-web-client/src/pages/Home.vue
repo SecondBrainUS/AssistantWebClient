@@ -1,8 +1,8 @@
 <template>
-  <div class="w-full h-full bg-gray-700 text-gray-100 flex items-center justify-center relative overflow-hidden">
+  <div class="w-full h-full bg-gray-700 text-gray-100 flex items-center justify-center relative overflow-hidden flex-col">
     <div class="glow"></div>
     <img src="@/assets/mush-v2-logo.png" alt="Logo" class="logo" />
-    <button class="workspace-button">Go To Workspace</button>
+      <router-link class="workspace-button" to="/workspace">Go To Workspace</router-link>
   </div>
 </template>
 
