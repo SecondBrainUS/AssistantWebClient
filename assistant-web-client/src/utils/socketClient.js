@@ -9,6 +9,17 @@ class SocketClient {
     this.isConnected = false;
     this.isConnecting = false;
     this.namespace = options.namespace || '/';
+    this.statusCallback = null;
+  }
+
+  onStatusChange(callback) {
+    this.statusCallback = callback;
+  }
+
+  updateStatus(status) {
+    if (this.statusCallback) {
+      this.statusCallback(status);
+    }
   }
 
   connect() {
@@ -19,6 +30,7 @@ class SocketClient {
       }
       
       this.isConnecting = true;
+      this.updateStatus('connecting');
       
       if (!this.socket) {
         console.log(`Attempting to connect to ${this.serverUrl} namespace ${this.namespace}`);
@@ -40,6 +52,7 @@ class SocketClient {
           console.log("Connected to the server with ID:", this.socket.id);
           this.isConnected = true;
           this.isConnecting = false;
+          this.updateStatus('connected');
           resolve();
         });
 
@@ -51,6 +64,7 @@ class SocketClient {
             transport: this.socket.io?.engine?.transport?.name
           });
           this.isConnecting = false;
+          this.updateStatus('disconnected');
           reject(err);
         });
 
@@ -60,10 +74,13 @@ class SocketClient {
 
         this.socket.on("reconnect_attempt", (attemptNumber) => {
           console.log("Reconnection attempt:", attemptNumber);
+          this.updateStatus('reconnecting');
         });
 
         this.socket.on("disconnect", (reason) => {
           console.warn("Disconnected from server:", reason);
+          this.isConnected = false;
+          this.updateStatus('disconnected');
         });
       } else if (this.isConnected) {
         this.isConnecting = false;

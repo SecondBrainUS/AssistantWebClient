@@ -62,7 +62,29 @@
     <div class="flex-1 flex flex-col">
       <!-- Model selector -->
       <div class="p-4 border-b border-gray-700">
-        <div class="relative max-w-xs ml-auto">
+        <div class="relative max-w-xs ml-auto flex items-center gap-4">
+          <!-- Connection status indicator -->
+          <div class="relative">
+            <div 
+              class="w-3 h-3 rounded-full cursor-help"
+              :class="{
+                'bg-green-500': socketStatus === 'connected',
+                'bg-yellow-500': socketStatus === 'connecting' || socketStatus === 'reconnecting',
+                'bg-red-500': socketStatus === 'disconnected'
+              }"
+              @mouseenter="showStatusTooltip = true"
+              @mouseleave="showStatusTooltip = false"
+            ></div>
+            <!-- Tooltip -->
+            <div 
+              v-if="showStatusTooltip"
+              class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
+            >
+              {{ socketStatusMessage }}
+            </div>
+          </div>
+
+          <!-- Existing model selector button -->
           <button 
             @click="isModelSelectorOpen = !isModelSelectorOpen"
             class="flex items-center justify-between w-full px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
@@ -241,6 +263,10 @@ const quote = ref([
     'I was trying to say something positive cause she\'s your friend'
   ][Math.floor(Math.random() * 2)]
 );
+const socketStatus = ref('disconnected')
+const showStatusTooltip = ref(false)
+const messageQueue = ref([])
+const notifications = ref([])
 // TODO: load this from your notion quote database
 
 // 3. Data Definitions
@@ -361,6 +387,21 @@ const selectedChat = computed(() => {
     .find(chat => chat.id === selectedChatId.value)
 })
 
+const socketStatusMessage = computed(() => {
+  switch (socketStatus.value) {
+    case 'connected':
+      return 'Connected to server'
+    case 'connecting':
+      return 'Connecting to server...'
+    case 'reconnecting':
+      return 'Reconnecting to server...'
+    case 'disconnected':
+      return 'Disconnected from server'
+    default:
+      return 'Unknown connection status'
+  }
+})
+
 // 5. Authentication Functions
 async function getAuthToken() {
   try {
@@ -390,17 +431,25 @@ async function initializeWebSocket() {
     const token = await getAuthToken()
     if (!token) {
       console.error('Failed to get authentication token')
+      socketStatus.value = 'disconnected'
       return
     }
 
     socketClient.value = new SocketClient('http://localhost:8000', {
-      auth: { 
-        token,
-        user_id: 'testtest'
-      },
+      auth: { token, user_id: 'testtest' },
       namespace: '/assistant/realtime',
       autoConnect: false,
       timeout: 10000,
+    })
+
+    // Update socket status based on events
+    socketClient.value.onStatusChange((status) => {
+      socketStatus.value = status
+      
+      // If we've reconnected, process queued messages
+      if (status === 'connected' && messageQueue.value.length > 0) {
+        processMessageQueue()
+      }
     })
 
     await socketClient.value.connect()
@@ -474,6 +523,7 @@ async function initializeWebSocket() {
 
   } catch (error) {
     console.error("Failed to initialize WebSocket:", error)
+    socketStatus.value = 'disconnected'
   }
 }
 
@@ -484,6 +534,28 @@ function selectChat(chatId) {
 
 async function sendMessage() {
   if (!newMessage.value.trim()) return
+
+  if (socketStatus.value !== 'connected') {
+    // Show error notification
+    const notification = {
+      type: 'error',
+      message: 'Not connected to server. Message will be sent when connection is restored.',
+      id: Date.now()
+    }
+    notifications.value.push(notification)
+    setTimeout(() => {
+      notifications.value = notifications.value.filter(n => n.id !== notification.id)
+    }, 5000)
+
+    // Queue message for later
+    messageQueue.value.push({
+      content: newMessage.value.trim(),
+      chatId: selectedChat.value?.id
+    })
+    
+    newMessage.value = ''
+    return
+  }
 
   // Create new chat if none selected
   if (!selectedChat.value) {
@@ -560,6 +632,19 @@ function filterChats() {
 }
 
 async function createNewChat() {
+  if (socketStatus.value !== 'connected') {
+    const notification = {
+      type: 'error',
+      message: 'Cannot create new chat while disconnected from server',
+      id: Date.now()
+    }
+    notifications.value.push(notification)
+    setTimeout(() => {
+      notifications.value = notifications.value.filter(n => n.id !== notification.id)
+    }, 5000)
+    return
+  }
+
   const newChatId = Date.now().toString()
   const now = new Date()
   
@@ -909,6 +994,52 @@ async function stopRecording() {
     console.log('Cleaning up recording state');
     isRecording.value = false;
     isProcessing.value = false;
+  }
+}
+
+// Add this new function to process queued messages
+async function processMessageQueue() {
+  while (messageQueue.value.length > 0 && socketStatus.value === 'connected') {
+    const message = messageQueue.value.shift()
+    try {
+      // Create new chat if needed
+      if (!selectedChat.value) {
+        await createNewChat()
+      }
+      
+      // Reuse existing sendMessage logic
+      const messageId = Date.now().toString()
+      messageStatuses.value.set(messageId, 'sending')
+      
+      selectedChat.value.messages.push({
+        id: messageId,
+        role: 'user',
+        content: message.content,
+        timestamp: new Date()
+      })
+
+      await socketClient.value?.sendMessage(selectedChat.value.id, {
+        type: 'conversation.item.create',
+        data: {
+          item: {
+            id: messageId,
+            type: 'message',
+            role: 'user',
+            content: [{
+              type: 'input_text',
+              text: message.content
+            }]
+          }
+        }
+      })
+
+      messageStatuses.value.set(messageId, 'sent')
+    } catch (error) {
+      console.error("Error processing queued message:", error)
+      // Re-queue message if failed
+      messageQueue.value.unshift(message)
+      break
+    }
   }
 }
 </script>
