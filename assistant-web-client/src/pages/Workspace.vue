@@ -483,7 +483,12 @@ function selectChat(chatId) {
 }
 
 async function sendMessage() {
-  if (!newMessage.value.trim() || !selectedChat.value) return
+  if (!newMessage.value.trim()) return
+
+  // Create new chat if none selected
+  if (!selectedChat.value) {
+    await createNewChat()
+  }
 
   const messageId = Date.now().toString()
   const now = new Date()
@@ -560,30 +565,41 @@ async function createNewChat() {
   
   try {
     // Create the chat in UI first
-    chatSections.value[0].chats.unshift({
+    const newChat = {
       id: newChatId,
-      title: 'New Chat',
+      title: 'New Chat',  // You might want to update this title later based on context
       timestamp: now,
       messages: []
-    })
+    }
+
+    // Add to beginning of first section or create new section
+    if (!chatSections.value[0]) {
+      chatSections.value.unshift({ chats: [] })
+    }
+    chatSections.value[0].chats.unshift(newChat)
+    
+    // Select the new chat
     selectChat(newChatId)
 
-    // Create room in socket server
+    // Create and join room in socket server
     if (socketClient.value) {
       console.log("Creating room for new chat:", newChatId)
-      // Wait for room creation confirmation before joining
       await socketClient.value.createRoom(newChatId)
       console.log("Room creation confirmed")
       await socketClient.value.joinRoom(newChatId)
       console.log("Room joined successfully")
     }
+
+    return newChat
   } catch (error) {
     console.error("Failed to create chat room:", error)
     // Remove the chat if room creation failed
-    chatSections.value[0].chats = chatSections.value[0].chats.filter(
-      chat => chat.id !== newChatId
-    )
-    // TODO: Show error notification to user
+    if (chatSections.value[0]) {
+      chatSections.value[0].chats = chatSections.value[0].chats.filter(
+        chat => chat.id !== newChatId
+      )
+    }
+    throw error  // Re-throw to handle in calling function
   }
 }
 
@@ -717,6 +733,11 @@ function playAudioBuffer(base64Audio) {
 // Add these methods for microphone handling
 async function startRecording() {
   try {
+    // Create new chat if none selected
+    if (!selectedChat.value) {
+      await createNewChat()
+    }
+
     if (isProcessing.value) {
       console.log('Already processing a request, please wait...');
       return;
