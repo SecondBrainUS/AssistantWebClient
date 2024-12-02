@@ -786,8 +786,10 @@ async function startRecording() {
         if (socketClient.value && selectedChat.value?.id) {
           const message = {
             type: 'input_audio_buffer.append',
-            event_id: `event_${Date.now()}`,
-            audio: base64Audio
+            data: {
+              audio: base64Audio,
+              event_id: `event_${Date.now()}`
+            }
           };
           
           await socketClient.value.sendMessage(selectedChat.value.id, message);
