@@ -7,14 +7,26 @@
     <div class="flex items-center">
       <router-link to="/contact" class="mx-2 text-white hover:underline">About</router-link>
       <div class="ml-3">
-        <img src="./assets/profile.jpg" alt="Profile" class="h-7 w-7 rounded-full" />
+        <img 
+          :src="userStore.profilePicture || defaultProfilePicture" 
+          alt="Profile" 
+          class="h-7 w-7 rounded-full object-cover"
+          @error="handleImageError"
+        />
       </div>
     </div>
   </nav>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useUserStore } from '../store/userStore'
 
 const userStore = useUserStore()
+const defaultProfilePicture = './assets/mush-v2-logo.png'
+
+const handleImageError = (e) => {
+  console.error('Failed to load profile image:', e)
+  e.target.src = defaultProfilePicture
+}
 </script>
