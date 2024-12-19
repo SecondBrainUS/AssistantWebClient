@@ -13,8 +13,8 @@
   </nav>
 </template>
 
-<script>
-export default {
-  name: 'SBNavbar',
-};
+<script setup>
+import { useUserStore } from '../store/userStore'
+
+const userStore = useUserStore()
 </script>

@@ -1,11 +1,17 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUserStore } from './store/userStore'
 import SBNavbar from './components/SBNavbar.vue'
-import HelloWorld from './components/HelloWorld.vue'
 import { RouterLink, RouterView } from 'vue-router'
 
 const route = useRoute()
+const userStore = useUserStore()
+
+onMounted(() => {
+  // Initialize auth state from localStorage
+  userStore.initializeAuth()
+})
 
 // Compute transition based on route
 const transitionName = computed(() => {
@@ -51,23 +57,17 @@ const transitionName = computed(() => {
 .fade-in-slow-enter-active{
   transition: opacity 1.1s ease-in-out, color 1.8s ease-in-out;
 }
-
 .fade-in-slow-enter-from,
 .fade-in-slow-leave-to {
   opacity: 0;
   color: #171717;
 }
-
-
 .fade-in-enter-active{
   transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
 }
-
 .fade-in-enter-from,
 .fade-in-leave-to {
   opacity: 0;
   color: #171717;
 }
-
 </style>
-

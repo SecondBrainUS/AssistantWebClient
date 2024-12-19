@@ -96,7 +96,7 @@
           </button>
 
           <!-- Dropdown menu -->
-          <div v-if="isModelSelectorOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50">
+          <div v-if="isModelSelectorOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
             <div class="p-2 space-y-1">
               <div v-for="model in models" :key="model.id" class="p-2">
                 <button 
@@ -273,7 +273,7 @@ const notifications = ref([])
 const models = ref([
   {
     id: 1,
-    name: 'GPT-4',
+    name: 'OpenAI Real Time GPT-4o',
     description: 'Most capable model for complex tasks'
   },
   {
@@ -462,6 +462,18 @@ async function initializeWebSocket() {
           const eventData = JSON.parse(data.message)
           
           switch (eventData.type) {
+            case 'conversation.item.input_audio_transcription.completed':
+              // Add transcribed message to chat
+              const transcriptMessage = {
+                id: eventData.item_id,
+                role: 'user',
+                content: eventData.transcript,
+                timestamp: new Date()
+              }
+              selectedChat.value.messages.push(transcriptMessage)
+              messageStatuses.value.set(eventData.item_id, 'sent')
+              break
+
             case 'response.audio.delta':
               // Handle incoming audio chunk
               playAudioBuffer(eventData.delta)

@@ -2,13 +2,19 @@
   <div class="w-full h-full bg-gray-700 text-gray-100 flex items-center justify-center relative overflow-hidden flex-col">
     <div class="glow"></div>
     <img src="@/assets/mush-v2-logo.png" alt="Logo" class="logo" />
-      <router-link class="workspace-button" to="/workspace">Go To Workspace</router-link>
+    <button @click="loginWithGoogle" class="login-button">Sign in with Google</button>
+    <router-link class="workspace-button" to="/workspace">Go To Workspace</router-link>
   </div>
 </template>
 
 <script>
 export default {
-  name: 'Home'
+  name: 'Home',
+  methods: {
+    loginWithGoogle() {
+      window.location = `http://localhost:8000/api/v1/auth/google/login`
+    }
+  }
 }
 </script>
 
