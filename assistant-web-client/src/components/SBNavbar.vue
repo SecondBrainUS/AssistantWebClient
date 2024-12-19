@@ -45,41 +45,36 @@ const router = useRouter()
 const defaultProfilePicture = defaultProfileImg
 const isDropdownOpen = ref(false)
 const profileImage = ref(null)
+const loadAttempts = ref(0)
+const MAX_RETRIES = 5
 
 const profilePictureUrl = computed(() => {
-  const picture = userStore.profilePicture
-  if (picture) {
-    // Preload the image
-    const img = new Image()
-    img.src = picture
-    return picture
-  }
-  return defaultProfilePicture
-})
-
-// Add this watch to debug when the URL changes
-watch(() => userStore.profilePicture, (newVal) => {
-  console.log('Profile picture URL changed to:', newVal)
-  if (newVal) {
-    const img = new Image()
-    img.onload = () => console.log('Pre-load successful')
-    img.onerror = (e) => console.log('Pre-load failed:', e)
-    img.src = newVal
-  }
+  return userStore.profilePicture || defaultProfilePicture
 })
 
 const handleImageError = (e) => {
   console.error('Image failed to load:', e.target.src)
   if (e.target.src !== defaultProfilePicture) {
-    console.log('Falling back to default profile picture')
-    e.target.src = defaultProfilePicture
+    loadAttempts.value++
+    console.log(`Load attempt ${loadAttempts.value} of ${MAX_RETRIES}`)
+    
+    if (loadAttempts.value >= MAX_RETRIES) {
+      console.error(`Failed to load profile picture after ${MAX_RETRIES} attempts`)
+      e.target.src = defaultProfilePicture
+      loadAttempts.value = 0  // Reset for potential future attempts
+    } else {
+      // Add a small delay before retry
+      setTimeout(() => {
+        e.target.src = userStore.profilePicture
+      }, 1000 * loadAttempts.value) // Increasing delay with each attempt
+    }
   }
 }
 
 const handleImageLoad = (e) => {
   console.log('=== IMAGE LOAD SUCCESS ===')
   console.log('Loaded src:', e.target.src)
-  console.log('Natural dimensions:', e.target.naturalWidth, 'x', e.target.naturalHeight)
+  loadAttempts.value = 0  // Reset attempts on successful load
 }
 
 const handleSignOut = () => {
