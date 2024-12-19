@@ -19,10 +19,13 @@ export const useUserStore = defineStore('user', {
         const decoded = jwtDecode(token)
         console.log('Decoded token:', decoded)
         this.user = decoded
-        // Get Google profile picture if available
+        // Enhanced logging for profile picture
         if (decoded.picture) {
+          console.log('Found picture in token:', decoded.picture)
           this.profilePicture = decoded.picture
-          console.log('Profile picture URL:', this.profilePicture)
+          console.log('Profile picture set in store:', this.profilePicture)
+        } else {
+          console.log('No picture found in token')
         }
       } catch (error) {
         console.error('Error decoding token:', error)
