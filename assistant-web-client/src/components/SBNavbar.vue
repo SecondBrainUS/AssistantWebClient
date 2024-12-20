@@ -54,6 +54,15 @@ const profilePictureUrl = computed(() => {
 
 const handleImageError = (e) => {
   console.error('Image failed to load:', e.target.src)
+  
+  // Check if the error is due to rate limiting (429)
+  if (e.target.status === 429) {
+    console.log('Rate limit reached (429), using default image')
+    e.target.src = defaultProfilePicture
+    loadAttempts.value = 0
+    return
+  }
+
   if (e.target.src !== defaultProfilePicture) {
     loadAttempts.value++
     console.log(`Load attempt ${loadAttempts.value} of ${MAX_RETRIES}`)
@@ -66,7 +75,7 @@ const handleImageError = (e) => {
       // Add a small delay before retry
       setTimeout(() => {
         e.target.src = userStore.profilePicture
-      }, 1000 * loadAttempts.value) // Increasing delay with each attempt
+      }, 1000 * loadAttempts.value)
     }
   }
 }
