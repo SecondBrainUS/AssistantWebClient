@@ -49,7 +49,8 @@ const loadAttempts = ref(0)
 const MAX_RETRIES = 5
 
 const profilePictureUrl = computed(() => {
-  return userStore.profilePicture || defaultProfilePicture
+  return defaultProfilePicture
+  // return userStore.profilePicture || defaultProfilePicture
 })
 
 const handleImageError = (e) => {

@@ -2,19 +2,33 @@
   <div class="w-full h-full bg-gray-700 text-gray-100 flex items-center justify-center relative overflow-hidden flex-col">
     <div class="glow"></div>
     <img src="@/assets/mush-v2-logo.png" alt="Logo" class="logo" />
-    <button @click="loginWithGoogle" class="login-button" style="z-index: 100;">Sign in with Google</button>
-    <router-link class="workspace-button" to="/workspace">Go To Workspace</router-link>
+    <button 
+      v-if="!isAuthenticated"
+      @click="loginWithGoogle" 
+      class="action-button"
+    >
+      Sign In
+    </button>
+    <router-link 
+      v-if="isAuthenticated"
+      class="action-button" 
+      to="/workspace"
+    >
+      Go To Workspace
+    </router-link>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'Home',
-  methods: {
-    loginWithGoogle() {
-      window.location = `http://localhost:8000/api/v1/auth/google/login`
-    }
-  }
+<script setup>
+import { useUserStore } from '../store/userStore'
+import { computed } from 'vue'
+
+const userStore = useUserStore()
+
+const isAuthenticated = computed(() => userStore.isAuthenticated)
+
+const loginWithGoogle = () => {
+  window.location = `http://localhost:8000/api/v1/auth/google/login`
 }
 </script>
 
@@ -65,7 +79,7 @@ export default {
   opacity: 1;
 }
 
-.workspace-button {
+.action-button {
   position: absolute;
   bottom: 20px;
   background-color: rgba(255, 255, 255, 0.2);
@@ -76,9 +90,10 @@ export default {
   cursor: pointer;
   z-index: 1;
   transition: background-color 0.3s ease;
+  text-decoration: none;
 }
 
-.workspace-button:hover {
+.action-button:hover {
   background-color: rgba(255, 255, 255, 0.3);
 }
 </style>

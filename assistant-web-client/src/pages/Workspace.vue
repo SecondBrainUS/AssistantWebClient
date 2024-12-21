@@ -201,6 +201,28 @@
             </button>
           </div>
 
+          <!-- Room status indicator -->
+          <div class="mt-2 flex justify-end">
+            <div class="relative">
+              <div 
+                class="w-3 h-3 rounded-full cursor-help"
+                :class="{
+                  'bg-green-500': roomStatus === 'connected',
+                  'bg-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
+                }"
+                @mouseenter="showRoomStatusTooltip = true"
+                @mouseleave="showRoomStatusTooltip = false"
+              ></div>
+              <!-- Tooltip -->
+              <div 
+                v-if="showRoomStatusTooltip"
+                class="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
+              >
+                {{ roomStatusMessage }}
+              </div>
+            </div>
+          </div>
+
           <!-- Action buttons -->
           <div class="flex items-center justify-center space-x-4 mt-4 text-gray-400">
             <button class="flex items-center space-x-2 hover:text-gray-200">
@@ -267,6 +289,8 @@ const socketStatus = ref('disconnected')
 const showStatusTooltip = ref(false)
 const messageQueue = ref([])
 const notifications = ref([])
+const roomStatus = ref('disconnected')
+const showRoomStatusTooltip = ref(false)
 // TODO: load this from your notion quote database
 
 // 3. Data Definitions
@@ -402,6 +426,19 @@ const socketStatusMessage = computed(() => {
   }
 })
 
+const roomStatusMessage = computed(() => {
+  switch (roomStatus.value) {
+    case 'connected':
+      return 'Connected to room'
+    case 'error':
+      return 'Room connection error'
+    case 'disconnected':
+      return 'Disconnected from room'
+    default:
+      return 'Unknown room status'
+  }
+})
+
 // 5. Authentication Functions
 async function getAuthToken() {
   try {
@@ -473,6 +510,20 @@ async function initializeWebSocket() {
               selectedChat.value.messages.push(transcriptMessage)
               messageStatuses.value.set(eventData.item_id, 'sent')
               break
+            case 'response.text.delta':
+              if (!currentAssistantMessage.value) {
+                currentAssistantMessage.value = {
+                  id: Date.now().toString(),
+                  role: 'assistant',
+                  content: eventData.delta,
+                  timestamp: new Date()
+                }
+                selectedChat.value.messages.push(currentAssistantMessage.value)
+              } else {
+                // Append to existing message
+                currentAssistantMessage.value.content += eventData.delta
+              }
+              break
 
             case 'response.audio.delta':
               // Handle incoming audio chunk
@@ -522,15 +573,23 @@ async function initializeWebSocket() {
     // Handle room events
     socketClient.value.onRoomCreated((data) => {
       console.log("Room created:", data)
+      roomStatus.value = 'connected'
     })
 
     socketClient.value.onRoomJoined((data) => {
       console.log("Joined room:", data)
+      roomStatus.value = 'connected'
     })
 
     socketClient.value.onRoomError((data) => {
       console.error("Room error:", data)
+      roomStatus.value = 'error'
       // TODO: Show error notification to user
+    })
+
+    socketClient.value.onRoomLeft((data) => {
+      console.log("Left room:", data)
+      roomStatus.value = 'disconnected'
     })
 
   } catch (error) {
