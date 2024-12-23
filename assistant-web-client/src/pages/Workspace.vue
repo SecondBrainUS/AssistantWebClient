@@ -172,53 +172,56 @@
       <!-- Input area -->
       <div class="p-4 border-t border-gray-700">
         <div class="max-w-3xl mx-auto">
-          <div class="relative bg-gray-800 rounded-lg flex items-center">
-            <textarea
-              v-model="newMessage"
-              rows="1"
-              class="w-full bg-transparent p-4 pr-20 focus:outline-none resize-none"
-              placeholder="Send a message"
-              @keyup.enter="sendMessage"
-            ></textarea>
-            <!-- Send Button -->
-            <button 
-              @click="sendMessage" 
-              class="p-2 mr-1 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
-            >
-              <Send class="h-6 w-6" />
-            </button>
-            <!-- Record Button -->
-            <button 
-              @click="isRecording ? stopRecording() : startRecording()" 
-              class="p-2 mr-2 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
-            >
-              <template v-if="isRecording">
-                <Square class="h-6 w-6 text-red-500" />
-              </template>
-              <template v-else>
-                <Mic class="h-6 w-6 text-white" />
-              </template>
-            </button>
-          </div>
-
-          <!-- Room status indicator -->
-          <div class="mt-2 flex justify-end">
-            <div class="relative">
-              <div 
-                class="w-3 h-3 rounded-full cursor-help"
-                :class="{
-                  'bg-green-500': roomStatus === 'connected',
-                  'bg-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
-                }"
-                @mouseenter="showRoomStatusTooltip = true"
-                @mouseleave="showRoomStatusTooltip = false"
-              ></div>
-              <!-- Tooltip -->
-              <div 
-                v-if="showRoomStatusTooltip"
-                class="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
+          <div class="flex items-center gap-4">
+            <!-- Input and controls wrapper -->
+            <div class="flex-1 relative bg-gray-800 rounded-lg flex items-center">
+              <textarea
+                v-model="newMessage"
+                rows="1"
+                class="flex-grow bg-transparent p-4 pr-20 focus:outline-none resize-none"
+                placeholder="Send a message"
+                @keyup.enter="sendMessage"
+              ></textarea>
+              <!-- Send Button -->
+              <button 
+                @click="sendMessage" 
+                class="p-2 mr-1 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
               >
-                {{ roomStatusMessage }}
+                <Send class="h-6 w-6" />
+              </button>
+              <!-- Record Button -->
+              <button 
+                @click="isRecording ? stopRecording() : startRecording()" 
+                class="p-2 mr-2 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
+              >
+                <template v-if="isRecording">
+                  <Square class="h-6 w-6 text-red-500" />
+                </template>
+                <template v-else>
+                  <Mic class="h-6 w-6 text-white" />
+                </template>
+              </button>
+            </div>
+
+            <!-- Room status indicator -->
+            <div class="flex items-center">
+              <div class="relative">
+                <div 
+                  class="w-3 h-3 rounded-full cursor-help"
+                  :class="{
+                    'bg-green-500': roomStatus === 'connected',
+                    'bg-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
+                  }"
+                  @mouseenter="showRoomStatusTooltip = true"
+                  @mouseleave="showRoomStatusTooltip = false"
+                ></div>
+                <!-- Tooltip -->
+                <div 
+                  v-if="showRoomStatusTooltip"
+                  class="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
+                >
+                  {{ roomStatusMessage }}
+                </div>
               </div>
             </div>
           </div>
