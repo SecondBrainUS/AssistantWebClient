@@ -10,6 +10,10 @@ class SocketClient {
     this.isConnecting = false;
     this.namespace = options.namespace || '/';
     this.statusCallback = null;
+    this.pendingItems = new Map();
+    this.chatCreatedCallback = null;
+    this.messageCallback = null;
+    this.debug = true;
   }
 
   onStatusChange(callback) {
@@ -53,6 +57,7 @@ class SocketClient {
           this.isConnected = true;
           this.isConnecting = false;
           this.updateStatus('connected');
+          this.setupMessageHandler();
           resolve();
         });
 
@@ -109,12 +114,7 @@ class SocketClient {
   }
 
   onMessage(callback) {
-    if (!this.isConnected) {
-      throw new Error("Socket is not connected. Call connect() first.");
-    }
-    this.socket.on("receive_message", (data) => {
-      callback(data);
-    });
+    this.messageCallback = callback;
   }
 
   onRoomCreated(callback) {
@@ -168,6 +168,89 @@ class SocketClient {
     this.socket.on("message_error", (data) => {
       console.error("Socket message error:", data)
       callback(data);
+    });
+  }
+
+  async sendConversationItem(roomId, item, userId, model, chatId = null) {
+    if (!this.isConnected) {
+      throw new Error("Socket is not connected. Call connect() first.");
+    }
+
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        this.pendingItems.delete(item.id);
+        reject(new Error("Conversation item creation timed out"));
+      }, 20000); // 20 second timeout
+
+      this.pendingItems.set(item.id, {
+        resolve,
+        reject,
+        timeoutId
+      });
+
+      // Send the create request
+      this.socket.emit("send_message", {
+        room_id: roomId,
+        message: {
+          type: "conversation.item.create",
+          data: { item },
+          chat_id: chatId // Add chat_id if available
+        },
+        userid: userId,
+        model: model
+      });
+    });
+  }
+
+  onChatCreated(callback) {
+    this.chatCreatedCallback = callback;
+  }
+
+  setupMessageHandler() {
+    this.socket.on("receive_message", (data) => {
+      if (this.debug) {
+        console.log("Received socket message:", data);
+      }
+
+      try {
+        // Handle chat_created events
+        if (data.event_type === "chat_created") {
+          if (this.debug) {
+            console.log("Chat created event received:", data);
+          }
+          if (this.chatCreatedCallback) {
+            this.chatCreatedCallback(data.data.chat_id);
+          }
+          return;
+        }
+
+        // Handle conversation.item.created events
+        if (data.message) {
+          try {
+            const eventData = JSON.parse(data.message);
+            if (eventData.type === "conversation.item.created") {
+              const itemId = eventData.item.id;
+              const pendingItem = this.pendingItems.get(itemId);
+              
+              if (pendingItem) {
+                clearTimeout(pendingItem.timeoutId);
+                this.pendingItems.delete(itemId);
+                pendingItem.resolve(eventData.item);
+              }
+              return;
+            }
+          } catch (error) {
+            console.error("Error processing item created event:", error);
+          }
+        }
+
+        // Handle all other messages
+        if (this.messageCallback) {
+          this.messageCallback(data);
+        }
+      } catch (error) {
+        console.error("Error in message handler:", error);
+      }
     });
   }
 }

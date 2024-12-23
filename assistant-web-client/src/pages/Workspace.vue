@@ -296,6 +296,7 @@ const messageQueue = ref([])
 const notifications = ref([])
 const roomStatus = ref('disconnected')
 const showRoomStatusTooltip = ref(false)
+const chatIds = ref(new Map()); // Map to store room_id -> chat_id mappings
 // TODO: load this from your notion quote database
 
 // 3. Data Definitions
@@ -597,6 +598,14 @@ async function initializeWebSocket() {
       roomStatus.value = 'disconnected'
     })
 
+    // Add handler for chat created events
+    socketClient.value.onChatCreated((chatId) => {
+      console.log("Chat created with ID:", chatId);
+      if (selectedChat.value) {
+        chatIds.value.set(selectedChat.value.id, chatId);
+      }
+    });
+
   } catch (error) {
     console.error("Failed to initialize WebSocket:", error)
     socketStatus.value = 'disconnected'
@@ -609,7 +618,7 @@ function selectChat(chatId) {
 }
 
 async function sendMessage() {
-  if (!newMessage.value.trim()) return
+  if (!newMessage.value.trim()) return;
 
   if (socketStatus.value !== 'connected') {
     // Show error notification
@@ -638,59 +647,73 @@ async function sendMessage() {
     await createNewChat()
   }
 
-  const messageId = Date.now().toString()
-  const now = new Date()
-  const messageContent = newMessage.value.trim()
+  const messageId = Date.now().toString();
+  const now = new Date();
+  const messageContent = newMessage.value.trim();
   
   try {
     // Add message to UI immediately with pending status
-    messageStatuses.value.set(messageId, 'sending')
+    messageStatuses.value.set(messageId, 'sending');
     selectedChat.value.messages.push({
       id: messageId,
       role: 'user',
       content: messageContent,
       timestamp: now
-    })
+    });
     
-    newMessage.value = ''
-    await nextTick()
-    const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
-    if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
-
-    // Send message in OpenAI format
-    await socketClient.value?.sendMessage(selectedChat.value.id, {
-      type: 'conversation.item.create',
-      data: {
-        item: {
-          id: messageId,
-          type: 'message',
-          role: 'user',
-          content: [{
-            type: 'input_text',
-            text: messageContent
-          }]
-        }
-      }
-    }, userStore.userid, selectedModel.value.name)
-
-    // TODO: wait for conversation.item.created
-
-    // Request AI response
-    await socketClient.value?.sendMessage(selectedChat.value.id, {
-      type: 'response.create',
-      data: {
-        response: {
-          modalities: ['text', 'audio'],
-          temperature: 0.7,
-          max_output_tokens: 1500,
-        }
-      }
-    })
+    newMessage.value = '';
+    await nextTick();
     
-    messageStatuses.value.set(messageId, 'sent')
+    // Get the chat ID if it exists for this room
+    const chatId = chatIds.value.get(selectedChat.value.id);
+
+    // Create the conversation item
+    const item = {
+      id: messageId,
+      type: 'message',
+      role: 'user',
+      content: [{
+        type: 'input_text',
+        text: messageContent
+      }]
+    };
+
+    // Wait for item creation confirmation
+    const createdItem = await socketClient.value?.sendConversationItem(
+      selectedChat.value.id,
+      item,
+      userStore.userid,
+      selectedModel.value.name,
+      chatId
+    );
+
+    // Only proceed with response creation after item is confirmed
+    if (createdItem) {
+      messageStatuses.value.set(messageId, 'sent');
+      
+      // Request AI response
+      await socketClient.value?.sendMessage(selectedChat.value.id, {
+        type: 'response.create',
+        data: {
+          response: {
+            modalities: ['text', 'audio'],
+            temperature: 0.7,
+            max_output_tokens: 1500,
+          }
+        }
+      });
+    }
+
   } catch (error) {
-    console.error("Error sending message:", error)
-    messageStatuses.value.set(messageId, 'error')
+    console.error("Error sending message:", error);
+    messageStatuses.value.set(messageId, 'error');
+    
+    // Show error notification
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to send message. Please try again.',
+      id: Date.now()
+    });
   }
 }
 
