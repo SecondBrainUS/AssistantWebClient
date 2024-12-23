@@ -7,6 +7,7 @@ const CACHE_DURATION_MS = 3 * 24 * 60 * 60 * 1000 // 3 days in milliseconds
 
 export const useUserStore = defineStore('user', {
   state: () => ({
+    userid: null,
     token: null,
     isAuthenticated: false,
     user: null,
@@ -23,6 +24,7 @@ export const useUserStore = defineStore('user', {
         const decoded = jwtDecode(token)
         console.log('Decoded token:', decoded)
         this.user = decoded
+        this.userid = decoded.user_id
         
         // Check if there's a cached profile picture
         const cachedProfilePicture = localStorage.getItem(PROFILE_PICTURE_CACHE_KEY)

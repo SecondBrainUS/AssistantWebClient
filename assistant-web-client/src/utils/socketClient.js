@@ -92,20 +92,20 @@ class SocketClient {
     });
   }
 
-  async joinRoom(roomId) {
+  async joinRoom(roomid) {
     if (!this.isConnected) {
       await this.connect()
     }
-    console.log("Joining room:", roomId)
-    this.socket.emit("join_room", { room_id: roomId })
+    console.log("Joining room:", roomid)
+    this.socket.emit("join_room", { room_id: roomid })
   }
 
-  sendMessage(roomId, message) {
+  sendMessage(roomid, message, userid, model) {
     if (!this.isConnected) {
       throw new Error("Socket is not connected. Call connect() first.")
     }
-    console.log("Sending message:", { room_id: roomId, message })
-    this.socket.emit("send_message", { room_id: roomId, message })
+    console.log("Sending message:", { room_id: roomid, message: message, userid: userid, model: model })
+    this.socket.emit("send_message", { room_id: roomid, message: message, userid: userid, model: model })
   }
 
   onMessage(callback) {
@@ -137,11 +137,11 @@ class SocketClient {
     }
   }
 
-  async createRoom(roomId) {
+  async createRoom(roomid) {
     if (!this.isConnected) {
       await this.connect()
     }
-    console.log("Creating room:", roomId)
+    console.log("Creating room:", roomid)
     return new Promise((resolve, reject) => {
       // Set up one-time listener for room creation confirmation
       this.socket.once("room_created", (data) => {
@@ -156,12 +156,19 @@ class SocketClient {
       })
 
       // Emit room creation request
-      this.socket.emit("create_room", { room_id: roomId })
+      this.socket.emit("create_room", { room_id: roomid })
     })
   }
 
   onRoomError(callback) {
     this.socket.on("room_error", callback)
+  }
+
+  onMessageError(callback) {
+    this.socket.on("message_error", (data) => {
+      console.error("Socket message error:", data)
+      callback(data);
+    });
   }
 }
 

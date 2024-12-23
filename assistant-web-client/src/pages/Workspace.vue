@@ -259,8 +259,10 @@ import {
   Send, Image, PenLine, HelpCircle, FileText, Mic, Square
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
+import { useUserStore } from '../store/userStore'
 
 // 2. State Management
+const userStore = useUserStore()
 const socketClient = ref(null)
 const roomName = ref('user123-workspace-13212')
 const selectedChatId = ref(null)
@@ -669,7 +671,9 @@ async function sendMessage() {
           }]
         }
       }
-    })
+    }, userStore.userid, selectedModel.value.name)
+
+    // TODO: wait for conversation.item.created
 
     // Request AI response
     await socketClient.value?.sendMessage(selectedChat.value.id, {
@@ -1092,7 +1096,8 @@ async function processMessageQueue() {
         timestamp: new Date()
       })
 
-      await socketClient.value?.sendMessage(selectedChat.value.id, {
+      await socketClient.value?.sendMessage(selectedChat.value.id, 
+      {
         type: 'conversation.item.create',
         data: {
           item: {
@@ -1104,8 +1109,10 @@ async function processMessageQueue() {
               text: message.content
             }]
           }
-        }
-      })
+        },
+      },
+      userStore.userid,
+      selectedModel.value.name)
 
       messageStatuses.value.set(messageId, 'sent')
     } catch (error) {
