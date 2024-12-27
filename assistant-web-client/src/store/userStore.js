@@ -11,7 +11,8 @@ export const useUserStore = defineStore('user', {
     token: null,
     isAuthenticated: false,
     user: null,
-    profilePicture: null
+    profilePicture: null,
+    loading: false
   }),
 
   actions: {
@@ -26,10 +27,12 @@ export const useUserStore = defineStore('user', {
         this.user = decoded
         this.userid = decoded.user_id
         
+
         // Check if there's a cached profile picture
         const cachedProfilePicture = localStorage.getItem(PROFILE_PICTURE_CACHE_KEY)
         const cacheExpiry = localStorage.getItem(PROFILE_PICTURE_CACHE_EXPIRY_KEY)
         
+        /*
         if (cachedProfilePicture && cacheExpiry && Date.now() < parseInt(cacheExpiry)) {
           console.log('Using cached profile picture')
           this.profilePicture = cachedProfilePicture
@@ -57,6 +60,7 @@ export const useUserStore = defineStore('user', {
             console.log('No picture found in token')
           }
         }
+        */
       } catch (error) {
         console.error('Error decoding token:', error)
       }
@@ -64,14 +68,22 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('auth_token', token)
     },
 
-    logout() {
-      this.token = null
-      this.isAuthenticated = false
-      this.user = null
-      this.profilePicture = null
-      localStorage.removeItem('auth_token')
-      localStorage.removeItem(PROFILE_PICTURE_CACHE_KEY)
-      localStorage.removeItem(PROFILE_PICTURE_CACHE_EXPIRY_KEY)
+    async logout() {
+      try {
+        await fetch('/api/v1/auth/logout', {
+          method: 'POST',
+          credentials: 'include'
+        })
+      } finally {
+        this.token = null
+        this.isAuthenticated = false
+        this.user = null
+        this.userid = null
+        this.profilePicture = null
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem(PROFILE_PICTURE_CACHE_KEY)
+        localStorage.removeItem(PROFILE_PICTURE_CACHE_EXPIRY_KEY)
+      }
     },
 
     // Initialize the store with stored token
@@ -79,6 +91,29 @@ export const useUserStore = defineStore('user', {
       const token = localStorage.getItem('auth_token')
       if (token) {
         this.setToken(token)
+      }
+    },
+
+    async checkAuth() {
+      try {
+        this.loading = true
+        const response = await fetch('/api/v1/auth/me', {
+          credentials: 'include'
+        })
+        
+        if (response.ok) {
+          const userData = await response.json()
+          this.user = userData
+          this.userid = userData.user_id
+          this.isAuthenticated = true
+        } else {
+          this.logout()
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        this.logout()
+      } finally {
+        this.loading = false
       }
     }
   }

@@ -7,19 +7,32 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-onMounted(() => {
-  const token = route.query.token
-  if (token) {
-    userStore.setToken(token)
+onMounted(async () => {
+  try {
+    const tempToken = route.query.temp_token
+    if (!tempToken) {
+      router.push('/')
+      return
+    }
+
+    // Now make a second request to actually set the cookies
+    const response = await fetch(
+      `/api/v1/auth/validate-token?temp_token=${tempToken}`,
+      {
+        credentials: 'include'
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error('Failed to complete authentication')
+    }
+
+    await userStore.checkAuth()
     router.push('/workspace')
-  } else {
+    
+  } catch (error) {
+    console.error('Authentication error:', error)
     router.push('/')
   }
 })
 </script>
-
-<template>
-  <div class="w-full h-full flex items-center justify-center">
-    <p>Logging you in...</p>
-  </div>
-</template> 

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '../store/userStore'
 
 const router = createRouter({
@@ -19,23 +19,35 @@ const router = createRouter({
     {
       path: '/login-success',
       name: 'login-success',
-      component: () => import('@/pages/LoginCallback.vue')
+      component: () => import('@/pages/LoginCallback.vue'),
+      meta: { requiresTemp: true } // New meta field
     }
   ]
-});
+})
 
-router.beforeEach((to, from, next) => {
-  // to.meta.previousPath = from.path
-  // to.meta.previousTransition = from.meta.transition
-  // next()
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   
-  // Define which routes require authentication
-  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
-    next('/')
-  } else {
-    next()
+  // Check if we need to validate authentication
+  if (to.meta.requiresAuth) {
+    // If we haven't checked auth status yet, do it now
+    if (!userStore.loading && !userStore.isAuthenticated) {
+      await userStore.checkAuth()
+    }
+    
+    if (!userStore.isAuthenticated) {
+      next('/')
+      return
+    }
   }
-});
+  
+  // Special handling for login-success route
+  if (to.meta.requiresTemp && !to.query.temp_token) {
+    next('/')
+    return
+  }
+  
+  next()
+})
 
-export default router;
+export default router

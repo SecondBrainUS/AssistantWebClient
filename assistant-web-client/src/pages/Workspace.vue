@@ -470,6 +470,8 @@ async function getAuthToken() {
 // 6. WebSocket Functions
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
+
+  await setCookie()
   try {
     const token = await getAuthToken()
     if (!token) {
@@ -478,7 +480,7 @@ async function initializeWebSocket() {
       return
     }
 
-    socketClient.value = new SocketClient('http://localhost:8000', {
+    socketClient.value = new SocketClient('http://localhost:8900', {
       auth: { token, user_id: 'testtest' },
       namespace: '/assistant/realtime',
       autoConnect: false,
@@ -1144,6 +1146,31 @@ async function processMessageQueue() {
       messageQueue.value.unshift(message)
       break
     }
+  }
+}
+
+async function setCookie() {
+  try {
+    const response = await fetch('http://localhost:8900/api/v1/auth/setcookie', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      // Include credentials to allow cookie setting
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Cookie set successfully:', data);
+    return data;
+
+  } catch (error) {
+    console.error('Error setting cookie:', error);
+    throw error;
   }
 }
 </script>
