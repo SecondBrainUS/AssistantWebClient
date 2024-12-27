@@ -9,8 +9,10 @@ const route = useRoute()
 const userStore = useUserStore()
 
 onMounted(() => {
-  // Initialize auth state from localStorage
-  userStore.initializeAuth()
+  // Only check auth status if we're not on the home page
+  if (route.path !== '/') {
+    userStore.initializeAuth()
+  }
 })
 
 // Compute transition based on route

@@ -260,6 +260,7 @@ import {
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
 import { useUserStore } from '../store/userStore'
+import api from '../utils/api'
 
 // 2. State Management
 const userStore = useUserStore()
@@ -811,6 +812,7 @@ onMounted(() => {
     }
   })
   
+  fetchChats();
   initializeWebSocket()
 })
 
@@ -1144,6 +1146,30 @@ async function processMessageQueue() {
       messageQueue.value.unshift(message)
       break
     }
+  }
+}
+
+async function fetchChats() {
+  try {
+    const response = await api.get('/api/v1/chat', {
+      params: {
+        limit: 20,
+        offset: 0
+      }
+    });
+
+    console.log(response.data)
+    
+    // Update chat sections with response data
+    if (response.data.chats.length > 0) {
+      chatSections.value = [{
+        title: 'Recent',
+        chats: response.data.chats
+      }];
+    }
+  } catch (error) {
+    console.error('Error fetching chats:', error);
+    // Handle error appropriately
   }
 }
 </script>
