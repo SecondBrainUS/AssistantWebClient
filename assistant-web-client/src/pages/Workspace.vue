@@ -260,6 +260,7 @@ import {
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
 import { useUserStore } from '../store/userStore'
+import baseApi from '../utils/baseApi';
 
 // 2. State Management
 const userStore = useUserStore()
@@ -447,6 +448,10 @@ const roomStatusMessage = computed(() => {
 
 // 5. Authentication Functions
 async function getAuthToken() {
+  
+  const response = await baseApi.get('/auth/protected-example');
+  console.log(response);
+
   try {
     const response = await fetch('http://localhost:8000/api/v1/local/live/token', {
       method: 'POST',

@@ -15,6 +15,8 @@ export const useUserStore = defineStore('user', {
     loading: false
   }),
 
+
+
   actions: {
     setToken(token) {
       this.token = token
@@ -25,7 +27,7 @@ export const useUserStore = defineStore('user', {
         const decoded = jwtDecode(token)
         console.log('Decoded token:', decoded)
         this.user = decoded
-        this.userid = decoded.user_id
+        this.userid = decoded.user_idA
         
 
         // Check if there's a cached profile picture
