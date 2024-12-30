@@ -3,16 +3,31 @@ import baseApi from '../utils/baseApi'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
+    user: null,
     userid: null,
     isAuthenticated: false,
-    user: null,
     profilePicture: null,
-    loading: false
+    loading: false,
+    authInitialized: false
   }),
 
   actions: {
-    // Remove token-related logic and use session-based auth
-    async setAuthenticated() {
+    async initializeAuth() {
+      if (this.authInitialized) return
+      
+      try {
+        this.loading = true
+        await this.checkAuth()
+      } catch (error) {
+        console.error('Failed to initialize auth:', error)
+        await this.logout()
+      } finally {
+        this.loading = false
+        this.authInitialized = true
+      }
+    },
+
+    async checkAuth() {
       try {
         const { data } = await baseApi.get('/auth/me')
         this.user = data
@@ -20,8 +35,8 @@ export const useUserStore = defineStore('user', {
         this.isAuthenticated = true
         this.profilePicture = data.picture
       } catch (error) {
-        console.error('Error setting authentication:', error)
-        await this.logout()
+        console.error('Auth check failed:', error)
+        throw error
       }
     },
 
@@ -33,23 +48,6 @@ export const useUserStore = defineStore('user', {
         this.user = null
         this.userid = null
         this.profilePicture = null
-      }
-    },
-
-    // Initialize auth state by checking session
-    async initializeAuth() {
-      await this.checkAuth()
-    },
-
-    async checkAuth() {
-      try {
-        this.loading = true
-        await this.setAuthenticated()
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        await this.logout()
-      } finally {
-        this.loading = false
       }
     }
   }

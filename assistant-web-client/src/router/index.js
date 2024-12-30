@@ -27,26 +27,22 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
-  
-  // Check if we need to validate authentication
-  if (to.meta.requiresAuth) {
-    // If we haven't checked auth status yet, do it now
-    if (!userStore.loading && !userStore.isAuthenticated) {
-      await userStore.checkAuth()
-    }
-    
-    if (!userStore.isAuthenticated) {
-      next('/')
-      return
-    }
+
+  // Wait for initial auth check only once
+  if (!userStore.authInitialized) {
+    await userStore.initializeAuth()
   }
-  
-  // Special handling for login-success route
+
+  if (to.meta.requiresAuth && !userStore.isAuthenticated) {
+    next('/')
+    return
+  }
+
   if (to.meta.requiresTemp && !to.query.temp_token) {
     next('/')
     return
   }
-  
+
   next()
 })
 
