@@ -1182,13 +1182,17 @@ async function loadChats(page = 0) {
     // Transform API chats into the expected format
     const formattedChats = chats.map(chat => ({
       id: chat.chat_id,
-      title: chat.title || 'New Chat', // Fallback title if none exists
-      timestamp: new Date(chat.created_at),
+      title: `Chat ${chat.chat_id.slice(0, 8)}`, // Use first 8 chars of chat_id as title
+      timestamp: new Date(chat.created_timestamp), // Updated to match API response
       messages: [] // Messages will be loaded separately when chat is selected
     }))
 
     // Add new chats to the existing list
     if (page === 0) {
+      // Ensure chatSections has at least one section
+      if (chatSections.value.length === 0) {
+        chatSections.value.push({ chats: [] })
+      }
       chatSections.value[0].chats = formattedChats
     } else {
       chatSections.value[0].chats.push(...formattedChats)
@@ -1197,7 +1201,6 @@ async function loadChats(page = 0) {
     chatPage.value = page
   } catch (error) {
     console.error('Error loading chats:', error)
-    // Show error notification
     notifications.value.push({
       type: 'error',
       message: 'Failed to load chats. Please try again.',
