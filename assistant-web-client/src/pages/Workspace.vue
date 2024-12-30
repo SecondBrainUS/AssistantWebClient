@@ -55,6 +55,11 @@
             </div>
           </div>
         </div>
+        
+        <!-- Loading indicator -->
+        <div v-if="isLoadingChats" class="flex justify-center py-4">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+        </div>
       </div>
     </div>
 
@@ -253,7 +258,7 @@
 
 <script setup>
 // 1. Imports
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { 
   Menu, Search, PenSquare, MessageSquare, ChevronDown,
   Send, Image, PenLine, HelpCircle, FileText, Mic, Square
@@ -298,7 +303,10 @@ const notifications = ref([])
 const roomStatus = ref('disconnected')
 const showRoomStatusTooltip = ref(false)
 const chatIds = ref(new Map()); // Map to store room_id -> chat_id mappings
-// TODO: load this from your notion quote database
+const isLoadingChats = ref(false)
+const chatPage = ref(0)
+const hasMoreChats = ref(true)
+const chatsPerPage = 20
 
 // 3. Data Definitions
 const models = ref([
@@ -349,29 +357,7 @@ const toggles = ref([
   }
 ])
 
-const chatSections = ref([
-  {
-    chats: [
-      { 
-        id: 1, 
-        title: 'Vite Vue.js Setup', 
-        timestamp: new Date(), 
-        messages: [
-          { 
-            role: 'user', 
-            content: 'How do I set up a new Vite Vue.js project?',
-            timestamp: new Date()
-          },
-          { 
-            role: 'system', 
-            content: 'To set up a new Vite Vue.js project, follow these steps:\n1. Open your terminal\n2. Run: npm create vite@latest my-vue-app -- --template vue\n3. cd into your new project directory\n4. Run: npm install\n5. Start the dev server with: npm run dev',
-            timestamp: new Date()
-          }
-        ]
-      }
-    ]
-  }
-])
+const chatSections = ref([{ chats: [] }])
 
 // 4. Computed Properties
 const organizedChatSections = computed(() => {
@@ -446,50 +432,17 @@ const roomStatusMessage = computed(() => {
   }
 })
 
-// 5. Authentication Functions
-async function getAuthToken() {
-  
-  const response = await baseApi.get('/auth/protected-example');
-  console.log(response);
-
-  try {
-    const response = await fetch('http://localhost:8000/api/v1/local/live/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: 'demo_user', // Replace with actual user credentials
-        password: 'demo_pass'
-      })
-    });
-    
-    const data = await response.json();
-    return data.access_token;
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    return null;
-  }
-}
-
 // 6. WebSocket Functions
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
 
-  await setCookie()
   try {
-    const token = await getAuthToken()
-    if (!token) {
-      console.error('Failed to get authentication token')
-      socketStatus.value = 'disconnected'
-      return
-    }
-
     socketClient.value = new SocketClient('http://localhost:8900', {
-      auth: { token, user_id: 'testtest' },
+      auth: { user_id: 'testtest' },
       namespace: '/assistant/realtime',
       autoConnect: false,
       timeout: 10000,
+      withCredentials: true,
     })
 
     // Update socket status based on events
@@ -620,8 +573,31 @@ async function initializeWebSocket() {
 }
 
 // 7. UI Event Handlers
-function selectChat(chatId) {
+async function selectChat(chatId) {
   selectedChatId.value = chatId
+  
+  try {
+    // Load messages for the selected chat
+    const messages = await baseApi.get(`/chat/${chatId}/messages`)
+    
+    // Find and update the selected chat's messages
+    const chat = chatSections.value[0].chats.find(c => c.id === chatId)
+    if (chat) {
+      chat.messages = messages.data.map(msg => ({
+        id: msg.message_id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.created_at)
+      }))
+    }
+  } catch (error) {
+    console.error('Error loading chat messages:', error)
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to load chat messages',
+      id: Date.now()
+    })
+  }
 }
 
 async function sendMessage() {
@@ -819,6 +795,15 @@ onMounted(() => {
   })
   
   initializeWebSocket()
+  
+  // Initial chat load
+  loadChats()
+  
+  // Add scroll listener to chat selector
+  const chatSelector = document.querySelector('.flex-1.overflow-y-auto')
+  if (chatSelector) {
+    chatSelector.addEventListener('scroll', handleScroll)
+  }
 })
 
 onUnmounted(() => {
@@ -830,6 +815,11 @@ onUnmounted(() => {
   }
   if (audioContext.value) {
     audioContext.value.close();
+  }
+  
+  const chatSelector = document.querySelector('.flex-1.overflow-y-auto')
+  if (chatSelector) {
+    chatSelector.removeEventListener('scroll', handleScroll)
   }
 })
 
@@ -1156,7 +1146,7 @@ async function processMessageQueue() {
 
 async function setCookie() {
   try {
-    const response = await fetch('http://localhost:8900/api/v1/auth/setcookie', {
+    const response = await fetch('http://localhost:8900/auth/setcookie', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -1176,6 +1166,54 @@ async function setCookie() {
   } catch (error) {
     console.error('Error setting cookie:', error);
     throw error;
+  }
+}
+
+async function loadChats(page = 0) {
+  if (isLoadingChats.value || !hasMoreChats.value) return
+  
+  try {
+    isLoadingChats.value = true
+    const response = await baseApi.get(`/chat?limit=${chatsPerPage}&offset=${page * chatsPerPage}`)
+    
+    const { chats, total, has_more } = response.data
+    hasMoreChats.value = has_more
+
+    // Transform API chats into the expected format
+    const formattedChats = chats.map(chat => ({
+      id: chat.chat_id,
+      title: chat.title || 'New Chat', // Fallback title if none exists
+      timestamp: new Date(chat.created_at),
+      messages: [] // Messages will be loaded separately when chat is selected
+    }))
+
+    // Add new chats to the existing list
+    if (page === 0) {
+      chatSections.value[0].chats = formattedChats
+    } else {
+      chatSections.value[0].chats.push(...formattedChats)
+    }
+    
+    chatPage.value = page
+  } catch (error) {
+    console.error('Error loading chats:', error)
+    // Show error notification
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to load chats. Please try again.',
+      id: Date.now()
+    })
+  } finally {
+    isLoadingChats.value = false
+  }
+}
+
+function handleScroll(event) {
+  const element = event.target
+  const reachedBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 100
+  
+  if (reachedBottom && !isLoadingChats.value && hasMoreChats.value) {
+    loadChats(chatPage.value + 1)
   }
 }
 </script>
