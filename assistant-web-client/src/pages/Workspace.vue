@@ -165,8 +165,36 @@
             </div>
             <div :class="[
               'p-3 rounded-lg',
-              message.role === 'user' ? 'bg-gray-600' : 'bg-gray-700'
-            ]">{{ message.content }}</div>
+              message.role === 'user' ? 'bg-gray-600' : 
+              message.role === 'assistant' ? 'bg-gray-700' :
+              message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
+            ]">
+              <!-- System function call message -->
+              <template v-if="message.role === 'system' && message.type === 'function_call'">
+                <div class="font-mono">
+                  <span class="text-blue-400">{{ message.name }}</span>
+                  <span class="text-gray-400">(</span>
+                  <div class="pl-4 text-green-400">
+                    {
+                    <div v-for="(value, key) in JSON.parse(message.arguments)" :key="key" class="pl-4">
+                      <span class="text-yellow-400">{{ key }}</span>
+                      <span class="text-gray-400">: </span>
+                      <span class="text-green-400">{{ 
+                        typeof value === 'object' ? 
+                          JSON.stringify(value, null, 2) : 
+                          JSON.stringify(value) 
+                      }}</span>,
+                    </div>
+                    }
+                  </div>
+                  <span class="text-gray-400">)</span>
+                </div>
+              </template>
+              <!-- Regular message content -->
+              <template v-else>
+                {{ message.content }}
+              </template>
+            </div>
           </div>
         </div>
         <div v-else class="h-full flex items-center justify-center">
@@ -584,10 +612,9 @@ async function selectChat(chatId) {
     const chat = chatSections.value[0].chats.find(c => c.id === chatId)
     if (chat) {
       chat.messages = messages.data.map(msg => ({
+        ...msg,
         id: msg.message_id,
-        role: msg.role,
-        content: msg.content,
-        timestamp: new Date(msg.created_at)
+        timestamp: new Date(msg.created_timestamp)
       }))
     }
   } catch (error) {
@@ -1186,6 +1213,7 @@ async function loadChats(page = 0) {
       timestamp: new Date(chat.created_timestamp), // Updated to match API response
       messages: [] // Messages will be loaded separately when chat is selected
     }))
+    console.log(formattedChats)
 
     // Add new chats to the existing list
     if (page === 0) {

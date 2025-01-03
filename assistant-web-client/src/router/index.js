@@ -20,7 +20,7 @@ const router = createRouter({
       path: '/login-success',
       name: 'login-success',
       component: () => import('@/pages/LoginCallback.vue'),
-      meta: { requiresTemp: true } // New meta field
+      meta: { requiresTemp: true }
     }
   ]
 })
@@ -28,7 +28,6 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
-  // Wait for initial auth check only once
   if (!userStore.authInitialized) {
     await userStore.initializeAuth()
   }
