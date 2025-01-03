@@ -47,11 +47,27 @@
               v-for="chat in section.chats"
               :key="chat.id"
               @click="selectChat(chat.id)"
-              class="px-2 py-1 hover:bg-gray-700 rounded cursor-pointer flex items-center"
+              class="px-2 py-1 hover:bg-gray-700 rounded cursor-pointer flex items-center justify-between group"
               :class="{ 'bg-gray-700': selectedChatId === chat.id }"
             >
-              <MessageSquare v-if="!isSidebarOpen" class="h-5 w-5" />
-              <span v-else>{{ chat.title }}</span>
+              <div class="flex items-center">
+                <MessageSquare v-if="!isSidebarOpen" class="h-5 w-5" />
+                <span v-else>{{ chat.title }}</span>
+              </div>
+              <!-- Add delete button -->
+              <button 
+                v-if="isSidebarOpen"
+                @click.stop="confirmDeleteChat(chat.id)"
+                class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-600 rounded"
+              >
+                <component 
+                  :is="deleteHoverStates[chat.id] ? Trash2 : TrashIcon"
+                  class="h-4 w-4 transition-colors"
+                  :class="deleteHoverStates[chat.id] ? 'text-red-500' : 'text-gray-400'"
+                  @mouseenter="deleteHoverStates[chat.id] = true"
+                  @mouseleave="deleteHoverStates[chat.id] = false"
+                />
+              </button>
             </div>
           </div>
         </div>
@@ -289,7 +305,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { 
   Menu, Search, PenSquare, MessageSquare, ChevronDown,
-  Send, Image, PenLine, HelpCircle, FileText, Mic, Square
+  Send, Image, PenLine, HelpCircle, FileText, Mic, Square, Trash2, TrashIcon
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
 import { useUserStore } from '../store/userStore'
@@ -335,6 +351,7 @@ const isLoadingChats = ref(false)
 const chatPage = ref(0)
 const hasMoreChats = ref(true)
 const chatsPerPage = 20
+const deleteHoverStates = ref({})
 
 // 3. Data Definitions
 const models = ref([
@@ -1245,6 +1262,39 @@ function handleScroll(event) {
   
   if (reachedBottom && !isLoadingChats.value && hasMoreChats.value) {
     loadChats(chatPage.value + 1)
+  }
+}
+
+async function confirmDeleteChat(chatId) {
+  if (confirm('Are you sure you want to delete this chat?')) {
+    try {
+      await baseApi.delete(`/chat/${chatId}`)
+      
+      // Remove chat from UI
+      chatSections.value = chatSections.value.map(section => ({
+        ...section,
+        chats: section.chats.filter(chat => chat.id !== chatId)
+      }))
+      
+      // If this was the selected chat, clear selection
+      if (selectedChatId.value === chatId) {
+        selectedChatId.value = null
+      }
+      
+      // Show success notification
+      notifications.value.push({
+        type: 'success',
+        message: 'Chat deleted successfully',
+        id: Date.now()
+      })
+    } catch (error) {
+      console.error('Error deleting chat:', error)
+      notifications.value.push({
+        type: 'error',
+        message: 'Failed to delete chat',
+        id: Date.now()
+      })
+    }
   }
 }
 </script>
