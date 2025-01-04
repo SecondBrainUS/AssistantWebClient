@@ -639,6 +639,23 @@ async function selectChat(chatId) {
         id: msg.message_id,
         timestamp: new Date(msg.created_timestamp)
       }))
+
+      // Find or create room for this chat
+      if (socketClient.value) {
+        try {
+          const roomData = await socketClient.value.findChat(chatId)
+          // Store the room ID with the chat
+          chat.roomId = roomData.room_id
+          console.log("Room found/created for chat:", roomData)
+        } catch (error) {
+          console.error('Error finding/creating room for chat:', error)
+          notifications.value.push({
+            type: 'error',
+            message: 'Failed to connect to chat room',
+            id: Date.now()
+          })
+        }
+      }
     }
   } catch (error) {
     console.error('Error loading chat messages:', error)
@@ -697,8 +714,10 @@ async function sendMessage() {
     newMessage.value = '';
     await nextTick();
     
-    // Get the chat ID if it exists for this room
-    const chatId = chatIds.value.get(selectedChat.value.id);
+    // Use the stored roomId instead of chat ID
+    if (!selectedChat.value.roomId) {
+      throw new Error('No room ID found for chat');
+    }
 
     // Create the conversation item
     const item = {
@@ -711,21 +730,20 @@ async function sendMessage() {
       }]
     };
 
-    // Wait for item creation confirmation
+    // Use roomId when sending messages
     const createdItem = await socketClient.value?.sendConversationItem(
-      selectedChat.value.id,
+      selectedChat.value.roomId,
       item,
       userStore.userid,
       selectedModel.value.name,
-      chatId
+      selectedChat.value.id  // Pass chat_id separately
     );
 
-    // Only proceed with response creation after item is confirmed
     if (createdItem) {
       messageStatuses.value.set(messageId, 'sent');
       
-      // Request AI response
-      await socketClient.value?.sendMessage(selectedChat.value.id, {
+      // Use roomId for response creation
+      await socketClient.value?.sendMessage(selectedChat.value.roomId, {
         type: 'response.create',
         data: {
           response: {
@@ -741,7 +759,6 @@ async function sendMessage() {
     console.error("Error sending message:", error);
     messageStatuses.value.set(messageId, 'error');
     
-    // Show error notification
     notifications.value.push({
       type: 'error',
       message: 'Failed to send message. Please try again.',
@@ -786,7 +803,7 @@ async function createNewChat() {
     // Create the chat in UI first
     const newChat = {
       id: newChatId,
-      title: 'New Chat',  // You might want to update this title later based on context
+      title: 'New Chat',
       timestamp: now,
       messages: []
     }
@@ -803,9 +820,11 @@ async function createNewChat() {
     // Create and join room in socket server
     if (socketClient.value) {
       console.log("Creating room for new chat:", newChatId)
-      await socketClient.value.createRoom(newChatId)
-      console.log("Room creation confirmed")
-      await socketClient.value.joinRoom(newChatId)
+      const roomData = await socketClient.value.createRoom(newChatId)
+      // Store the room ID with the chat
+      newChat.roomId = roomData.room_id
+      console.log("Room creation confirmed, roomId:", newChat.roomId)
+      await socketClient.value.joinRoom(newChat.roomId)
       console.log("Room joined successfully")
     }
 
@@ -818,7 +837,7 @@ async function createNewChat() {
         chat => chat.id !== newChatId
       )
     }
-    throw error  // Re-throw to handle in calling function
+    throw error
   }
 }
 

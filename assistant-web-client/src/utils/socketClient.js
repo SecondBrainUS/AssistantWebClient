@@ -160,6 +160,30 @@ class SocketClient {
     })
   }
 
+  async findChat(chatId) {
+    if (!this.isConnected) {
+      await this.connect()
+    }
+    console.log("Finding chat:", chatId)
+    return new Promise((resolve, reject) => {
+      // Set up one-time listener for room joined confirmation
+      this.socket.once("room_joined", (data) => {
+        console.log("Room joined for chat:", data)
+        this.joinRoom(data.room_id)
+        resolve(data)
+      })
+
+      // Set up one-time listener for room error
+      this.socket.once("room_error", (error) => {
+        console.error("Find chat failed:", error)
+        reject(error)
+      })
+
+      // Emit find chat request
+      this.socket.emit("find_chat", { chat_id: chatId })
+    })
+  }
+
   onRoomError(callback) {
     this.socket.on("room_error", callback)
   }
