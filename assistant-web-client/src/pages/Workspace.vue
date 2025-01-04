@@ -647,6 +647,84 @@ async function selectChat(chatId) {
           // Store the room ID with the chat
           chat.roomId = roomData.room_id
           console.log("Room found/created for chat:", roomData)
+          
+          // Reset current assistant message when switching chats
+          currentAssistantMessage.value = null
+          
+          // Set up message handler for this chat
+          socketClient.value.onMessage((data) => {
+            console.log("Received message:", data)
+            if (selectedChat.value && data.room_id === selectedChat.value.roomId) {
+              try {
+                const eventData = JSON.parse(data.message)
+                
+                switch (eventData.type) {
+                  case 'conversation.item.input_audio_transcription.completed':
+                    // Add transcribed message to chat
+                    const transcriptMessage = {
+                      id: eventData.item_id,
+                      role: 'user',
+                      content: eventData.transcript,
+                      timestamp: new Date()
+                    }
+                    selectedChat.value.messages.push(transcriptMessage)
+                    messageStatuses.value.set(eventData.item_id, 'sent')
+                    break
+                    
+                  case 'response.text.delta':
+                    if (!currentAssistantMessage.value) {
+                      currentAssistantMessage.value = {
+                        id: Date.now().toString(),
+                        role: 'assistant',
+                        content: eventData.delta,
+                        timestamp: new Date()
+                      }
+                      selectedChat.value.messages.push(currentAssistantMessage.value)
+                    } else {
+                      // Append to existing message
+                      currentAssistantMessage.value.content += eventData.delta
+                    }
+                    break
+
+                  case 'response.audio.delta':
+                    // Handle incoming audio chunk
+                    playAudioBuffer(eventData.delta)
+                    break
+
+                  case 'response.audio_transcript.delta':
+                    // If this is the first chunk of the response, create a new message
+                    if (!currentAssistantMessage.value) {
+                      currentAssistantMessage.value = {
+                        id: Date.now().toString(),
+                        role: 'assistant',
+                        content: eventData.delta,
+                        timestamp: new Date()
+                      }
+                      selectedChat.value.messages.push(currentAssistantMessage.value)
+                    } else {
+                      // Append to existing message
+                      currentAssistantMessage.value.content += eventData.delta
+                    }
+                    break
+
+                  case 'response.audio_transcript.done':
+                  case 'response.done':
+                    // Reset for next message
+                    currentAssistantMessage.value = null
+                    break
+                }
+
+                // Scroll to bottom on new content
+                nextTick(() => {
+                  const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
+                  if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
+                })
+              } catch (error) {
+                console.error('Error processing message:', error)
+              }
+            }
+          })
+          
         } catch (error) {
           console.error('Error finding/creating room for chat:', error)
           notifications.value.push({
