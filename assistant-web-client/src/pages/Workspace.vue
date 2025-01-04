@@ -190,19 +190,19 @@
                 <div class="font-mono">
                   <span class="text-blue-400">{{ message.name }}</span>
                   <span class="text-gray-400">(</span>
-                  <div class="pl-4 text-green-400">
+                  <span class="text-green-400">
                     {
-                    <div v-for="(value, key) in JSON.parse(message.arguments)" :key="key" class="pl-4">
+                    <template v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
                       <span class="text-yellow-400">{{ key }}</span>
                       <span class="text-gray-400">: </span>
                       <span class="text-green-400">{{ 
                         typeof value === 'object' ? 
-                          JSON.stringify(value, null, 2) : 
+                          JSON.stringify(value) : 
                           JSON.stringify(value) 
                       }}</span>,
-                    </div>
+                    </template>
                     }
-                  </div>
+                  </span>
                   <span class="text-gray-400">)</span>
                 </div>
               </template>
