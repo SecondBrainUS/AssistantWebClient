@@ -28,7 +28,7 @@ const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isAuthenticated)
 
 const loginWithGoogle = () => {
-  window.location = `http://localhost:8000/api/v1/auth/google/login`
+  window.location = `http://localhost:8900/api/v1/auth/google/login`
 }
 </script>
 
