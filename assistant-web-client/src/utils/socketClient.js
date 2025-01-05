@@ -14,6 +14,7 @@ class SocketClient {
     this.chatCreatedCallback = null;
     this.messageCallback = null;
     this.debug = true;
+    this.messageHandlerSet = false;
   }
 
   onStatusChange(callback) {
@@ -114,18 +115,28 @@ class SocketClient {
   }
 
   onMessage(callback) {
+    if (this.messageCallback) {
+      this.socket.off("receive_message");
+      this.messageHandlerSet = false;
+    }
     this.messageCallback = callback;
+    if (this.socket && this.isConnected) {
+      this.setupMessageHandler();
+    }
   }
 
   onRoomCreated(callback) {
+    this.socket.off("room_created");
     this.socket.on("room_created", callback);
   }
 
   onRoomJoined(callback) {
+    this.socket.off("room_joined");
     this.socket.on("room_joined", callback);
   }
 
   onRoomLeft(callback) {
+    this.socket.off("room_left");
     this.socket.on("room_left", callback);
   }
 
@@ -185,7 +196,8 @@ class SocketClient {
   }
 
   onRoomError(callback) {
-    this.socket.on("room_error", callback)
+    this.socket.off("room_error");
+    this.socket.on("room_error", callback);
   }
 
   onMessageError(callback) {
@@ -231,6 +243,10 @@ class SocketClient {
   }
 
   setupMessageHandler() {
+    if (this.messageHandlerSet) {
+      this.socket.off("receive_message");
+    }
+
     this.socket.on("receive_message", (data) => {
       if (this.debug) {
         console.log("Received socket message:", data);
@@ -276,6 +292,8 @@ class SocketClient {
         console.error("Error in message handler:", error);
       }
     });
+
+    this.messageHandlerSet = true;
   }
 }
 
