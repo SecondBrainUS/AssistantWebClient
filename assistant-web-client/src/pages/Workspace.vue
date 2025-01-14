@@ -650,9 +650,18 @@ async function selectChat(chatId) {
       if (socketClient.value) {
         try {
           const roomData = await socketClient.value.findChat(chatId)
-          // Store the room ID with the chat
-          chat.roomId = roomData.room_id
-          console.log("Room found/created for chat:", roomData)
+          if (roomData.room_id) {
+            // Store the room ID with the chat
+            chat.roomId = roomData.room_id
+            await socketClient.value.joinRoom(roomData.room_id)
+            console.log("Room found/created for chat:", roomData)
+          } else {
+            // Create room
+            const roomData = await socketClient.value.createRoom(chatId);
+            // Store the room ID with the chat
+            chat.roomId = roomData.room_id
+            console.log("Room created for chat:", roomData)
+          }
           
           // Reset current assistant message when switching chats
           currentAssistantMessage.value = null
