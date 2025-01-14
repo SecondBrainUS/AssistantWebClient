@@ -419,19 +419,25 @@ const organizedChatSections = computed(() => {
       title: 'Today',
       chats: allChats
         .filter(chat => chat.timestamp >= today)
-        .sort((a, b) => b.timestamp - a.timestamp)  // Sort newest first
+        .sort((a, b) => b.timestamp - a.timestamp)
     },
     {
       title: 'Yesterday',
       chats: allChats
         .filter(chat => chat.timestamp >= yesterday && chat.timestamp < today)
-        .sort((a, b) => b.timestamp - a.timestamp)  // Sort newest first
+        .sort((a, b) => b.timestamp - a.timestamp)
     },
     {
       title: 'Previous 7 Days',
       chats: allChats
         .filter(chat => chat.timestamp >= weekAgo && chat.timestamp < yesterday)
-        .sort((a, b) => b.timestamp - a.timestamp)  // Sort newest first
+        .sort((a, b) => b.timestamp - a.timestamp)
+    },
+    {
+      title: 'Older',
+      chats: allChats
+        .filter(chat => chat.timestamp < weekAgo)
+        .sort((a, b) => b.timestamp - a.timestamp)
     }
   ]
 
