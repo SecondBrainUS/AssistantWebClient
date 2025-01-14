@@ -404,7 +404,6 @@ const toggles = ref([
 
 const chatSections = ref([{ chats: [] }])
 
-// 4. Computed Properties
 const organizedChatSections = computed(() => {
   const allChats = chatSections.value.flatMap(section => section.chats)
   const now = new Date()
