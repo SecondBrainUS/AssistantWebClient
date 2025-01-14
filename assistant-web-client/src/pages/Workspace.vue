@@ -489,7 +489,6 @@ const roomStatusMessage = computed(() => {
   }
 })
 
-// 6. WebSocket Functions
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
 
@@ -629,7 +628,6 @@ async function initializeWebSocket() {
   }
 }
 
-// 7. UI Event Handlers
 async function selectChat(chatId) {
   selectedChatId.value = chatId
   
@@ -946,7 +944,6 @@ function selectModel(model) {
   isModelSelectorOpen.value = false
 }
 
-// 8. Lifecycle Hooks
 onMounted(() => {
   // Click outside handler
   document.addEventListener('click', (e) => {
@@ -984,6 +981,144 @@ onUnmounted(() => {
     chatSelector.removeEventListener('scroll', handleScroll)
   }
 })
+
+// Add this new function to process queued messages
+async function processMessageQueue() {
+  while (messageQueue.value.length > 0 && socketStatus.value === 'connected') {
+    const message = messageQueue.value.shift()
+    try {
+      // Create new chat if needed
+      if (!selectedChat.value) {
+        await createNewChat()
+      }
+      
+      // Reuse existing sendMessage logic
+      const messageId = Date.now().toString()
+      messageStatuses.value.set(messageId, 'sending')
+      
+      selectedChat.value.messages.push({
+        id: messageId,
+        role: 'user',
+        content: message.content,
+        timestamp: new Date()
+      })
+
+      await socketClient.value?.sendMessage(selectedChat.value.id, 
+      {
+        type: 'conversation.item.create',
+        data: {
+          item: {
+            id: messageId,
+            type: 'message',
+            role: 'user',
+            content: [{
+              type: 'input_text',
+              text: message.content
+            }]
+          }
+        },
+      },
+      userStore.userid,
+      selectedModel.value.name)
+
+      messageStatuses.value.set(messageId, 'sent')
+    } catch (error) {
+      console.error("Error processing queued message:", error)
+      // Re-queue message if failed
+      messageQueue.value.unshift(message)
+      break
+    }
+  }
+}
+
+async function loadChats(page = 0) {
+  if (isLoadingChats.value || !hasMoreChats.value) return
+  
+  try {
+    isLoadingChats.value = true
+    const response = await baseApi.get(`/chat?limit=${chatsPerPage}&offset=${page * chatsPerPage}`)
+    
+    const { chats, total, has_more } = response.data
+    hasMoreChats.value = has_more
+
+    // Transform API chats into the expected format
+    const formattedChats = chats.map(chat => ({
+      id: chat.chat_id,
+      title: `Chat ${chat.chat_id.slice(0, 8)}`, // Use first 8 chars of chat_id as title
+      timestamp: new Date(chat.created_timestamp), // Updated to match API response
+      messages: [] // Messages will be loaded separately when chat is selected
+    }))
+    console.log(formattedChats)
+
+    // Add new chats to the existing list
+    if (page === 0) {
+      // Ensure chatSections has at least one section
+      if (chatSections.value.length === 0) {
+        chatSections.value.push({ chats: [] })
+      }
+      chatSections.value[0].chats = formattedChats
+    } else {
+      chatSections.value[0].chats.push(...formattedChats)
+    }
+    
+    chatPage.value = page
+  } catch (error) {
+    console.error('Error loading chats:', error)
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to load chats. Please try again.',
+      id: Date.now()
+    })
+  } finally {
+    isLoadingChats.value = false
+  }
+}
+
+function handleScroll(event) {
+  const element = event.target
+  const reachedBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 100
+  
+  if (reachedBottom && !isLoadingChats.value && hasMoreChats.value) {
+    loadChats(chatPage.value + 1)
+  }
+}
+
+async function confirmDeleteChat(chatId) {
+  if (confirm('Are you sure you want to delete this chat?')) {
+    try {
+      await baseApi.delete(`/chat/${chatId}`)
+      
+      // Remove chat from UI
+      chatSections.value = chatSections.value.map(section => ({
+        ...section,
+        chats: section.chats.filter(chat => chat.id !== chatId)
+      }))
+      
+      // If this was the selected chat, clear selection
+      if (selectedChatId.value === chatId) {
+        selectedChatId.value = null
+      }
+      
+      // Show success notification
+      notifications.value.push({
+        type: 'success',
+        message: 'Chat deleted successfully',
+        id: Date.now()
+      })
+    } catch (error) {
+      console.error('Error deleting chat:', error)
+      notifications.value.push({
+        type: 'error',
+        message: 'Failed to delete chat',
+        id: Date.now()
+      })
+    }
+  }
+}
+
+//====================================================
+// Audio Functions
+//====================================================
 
 // Add this method to handle audio playback
 function processAudioQueue() {
@@ -1257,164 +1392,6 @@ async function stopRecording() {
   }
 }
 
-// Add this new function to process queued messages
-async function processMessageQueue() {
-  while (messageQueue.value.length > 0 && socketStatus.value === 'connected') {
-    const message = messageQueue.value.shift()
-    try {
-      // Create new chat if needed
-      if (!selectedChat.value) {
-        await createNewChat()
-      }
-      
-      // Reuse existing sendMessage logic
-      const messageId = Date.now().toString()
-      messageStatuses.value.set(messageId, 'sending')
-      
-      selectedChat.value.messages.push({
-        id: messageId,
-        role: 'user',
-        content: message.content,
-        timestamp: new Date()
-      })
-
-      await socketClient.value?.sendMessage(selectedChat.value.id, 
-      {
-        type: 'conversation.item.create',
-        data: {
-          item: {
-            id: messageId,
-            type: 'message',
-            role: 'user',
-            content: [{
-              type: 'input_text',
-              text: message.content
-            }]
-          }
-        },
-      },
-      userStore.userid,
-      selectedModel.value.name)
-
-      messageStatuses.value.set(messageId, 'sent')
-    } catch (error) {
-      console.error("Error processing queued message:", error)
-      // Re-queue message if failed
-      messageQueue.value.unshift(message)
-      break
-    }
-  }
-}
-
-async function setCookie() {
-  try {
-    const response = await fetch('http://localhost:8900/auth/setcookie', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      // Include credentials to allow cookie setting
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('Cookie set successfully:', data);
-    return data;
-
-  } catch (error) {
-    console.error('Error setting cookie:', error);
-    throw error;
-  }
-}
-
-async function loadChats(page = 0) {
-  if (isLoadingChats.value || !hasMoreChats.value) return
-  
-  try {
-    isLoadingChats.value = true
-    const response = await baseApi.get(`/chat?limit=${chatsPerPage}&offset=${page * chatsPerPage}`)
-    
-    const { chats, total, has_more } = response.data
-    hasMoreChats.value = has_more
-
-    // Transform API chats into the expected format
-    const formattedChats = chats.map(chat => ({
-      id: chat.chat_id,
-      title: `Chat ${chat.chat_id.slice(0, 8)}`, // Use first 8 chars of chat_id as title
-      timestamp: new Date(chat.created_timestamp), // Updated to match API response
-      messages: [] // Messages will be loaded separately when chat is selected
-    }))
-    console.log(formattedChats)
-
-    // Add new chats to the existing list
-    if (page === 0) {
-      // Ensure chatSections has at least one section
-      if (chatSections.value.length === 0) {
-        chatSections.value.push({ chats: [] })
-      }
-      chatSections.value[0].chats = formattedChats
-    } else {
-      chatSections.value[0].chats.push(...formattedChats)
-    }
-    
-    chatPage.value = page
-  } catch (error) {
-    console.error('Error loading chats:', error)
-    notifications.value.push({
-      type: 'error',
-      message: 'Failed to load chats. Please try again.',
-      id: Date.now()
-    })
-  } finally {
-    isLoadingChats.value = false
-  }
-}
-
-function handleScroll(event) {
-  const element = event.target
-  const reachedBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 100
-  
-  if (reachedBottom && !isLoadingChats.value && hasMoreChats.value) {
-    loadChats(chatPage.value + 1)
-  }
-}
-
-async function confirmDeleteChat(chatId) {
-  if (confirm('Are you sure you want to delete this chat?')) {
-    try {
-      await baseApi.delete(`/chat/${chatId}`)
-      
-      // Remove chat from UI
-      chatSections.value = chatSections.value.map(section => ({
-        ...section,
-        chats: section.chats.filter(chat => chat.id !== chatId)
-      }))
-      
-      // If this was the selected chat, clear selection
-      if (selectedChatId.value === chatId) {
-        selectedChatId.value = null
-      }
-      
-      // Show success notification
-      notifications.value.push({
-        type: 'success',
-        message: 'Chat deleted successfully',
-        id: Date.now()
-      })
-    } catch (error) {
-      console.error('Error deleting chat:', error)
-      notifications.value.push({
-        type: 'error',
-        message: 'Failed to delete chat',
-        id: Date.now()
-      })
-    }
-  }
-}
 </script>
 
 <style>
