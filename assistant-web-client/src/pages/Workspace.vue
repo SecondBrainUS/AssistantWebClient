@@ -153,149 +153,26 @@
       </div>
 
       <!-- Chat area -->
-      <div class="flex-1 p-4 overflow-y-auto">
-        <div v-if="selectedChat">
-          <div v-for="message in selectedChat.messages" 
-               :key="message.id" 
-               class="mb-4"
-          >
-            <div class="flex justify-between items-center mb-1">
-              <div class="font-semibold">{{ message.role }}</div>
-              <div class="flex items-center space-x-2">
-                <div class="text-xs text-gray-400">
-                  {{ formatTimestamp(message.timestamp) }}
-                </div>
-                <!-- Message status indicator -->
-                <div v-if="message.role === 'user'" class="text-xs">
-                  <template v-if="messageStatuses.get(message.id) === 'sending'">
-                    <span class="text-yellow-500">Sending...</span>
-                  </template>
-                  <template v-else-if="messageStatuses.get(message.id) === 'sent'">
-                    <span class="text-green-500">✓</span>
-                  </template>
-                  <template v-else-if="messageStatuses.get(message.id) === 'error'">
-                    <span class="text-red-500">Failed to send</span>
-                  </template>
-                </div>
-              </div>
-            </div>
-            <div :class="[
-              'p-3 rounded-lg',
-              message.role === 'user' ? 'bg-gray-600' : 
-              message.role === 'assistant' ? 'bg-gray-700' :
-              message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
-            ]">
-              <!-- System function call message -->
-              <template v-if="message.role === 'system' && message.type === 'function_call'">
-                <div class="font-mono">
-                  <span class="text-blue-400">{{ message.name }}</span>
-                  <span class="text-gray-400">(</span>
-                  <span class="text-green-400">
-                    {
-                    <template v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                      <span class="text-yellow-400">{{ key }}</span>
-                      <span class="text-gray-400">: </span>
-                      <span class="text-green-400">{{ 
-                        typeof value === 'object' ? 
-                          JSON.stringify(value) : 
-                          JSON.stringify(value) 
-                      }}</span>,
-                    </template>
-                    }
-                  </span>
-                  <span class="text-gray-400">)</span>
-                </div>
-              </template>
-              <!-- Regular message content -->
-              <template v-else>
-                {{ message.content }}
-              </template>
-            </div>
-          </div>
-        </div>
-        <div v-else class="h-full flex items-center justify-center">
-          <div class="text-3xl font-semibold text-gray-300">{{ startingMessage}}</div>
-        </div>
-      </div>
-
-      <!-- Input area -->
-      <div class="p-4 border-t border-gray-700">
-        <div class="max-w-3xl mx-auto">
-          <div class="flex items-center gap-4">
-            <!-- Input and controls wrapper -->
-            <div class="flex-1 relative bg-gray-800 rounded-lg flex items-center">
-              <textarea
-                v-model="newMessage"
-                rows="1"
-                class="flex-grow bg-transparent p-4 pr-20 focus:outline-none resize-none"
-                placeholder="Send a message"
-                @keyup.enter="sendMessage"
-              ></textarea>
-              <!-- Send Button -->
-              <button 
-                @click="sendMessage" 
-                class="p-2 mr-1 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
-              >
-                <Send class="h-6 w-6" />
-              </button>
-              <!-- Record Button -->
-              <button 
-                @click="isRecording ? stopRecording() : startRecording()" 
-                class="p-2 mr-2 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
-              >
-                <template v-if="isRecording">
-                  <Square class="h-6 w-6 text-red-500" />
-                </template>
-                <template v-else>
-                  <Mic class="h-6 w-6 text-white" />
-                </template>
-              </button>
-            </div>
-
-            <!-- Room status indicator -->
-            <div class="flex items-center">
-              <div class="relative">
-                <div 
-                  class="w-3 h-3 rounded-full cursor-help"
-                  :class="{
-                    'bg-green-500': roomStatus === 'connected',
-                    'bg-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
-                  }"
-                  @mouseenter="showRoomStatusTooltip = true"
-                  @mouseleave="showRoomStatusTooltip = false"
-                ></div>
-                <!-- Tooltip -->
-                <div 
-                  v-if="showRoomStatusTooltip"
-                  class="absolute bottom-full right-0 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
-                >
-                  {{ roomStatusMessage }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Action buttons -->
-          <div class="flex items-center justify-center space-x-4 mt-4 text-gray-400">
-            <button class="flex items-center space-x-2 hover:text-gray-200">
-              <Image class="h-5 w-5" />
-              <span class="text-sm">Create image</span>
-            </button>
-            <button class="flex items-center space-x-2 hover:text-gray-200">
-              <PenLine class="h-5 w-5" />
-              <span class="text-sm">Help me write</span>
-            </button>
-            <button class="flex items-center space-x-2 hover:text-gray-200">
-              <HelpCircle class="h-5 w-5" />
-              <span class="text-sm">Get advice</span>
-            </button>
-            <button class="flex items-center space-x-2 hover:text-gray-200">
-              <FileText class="h-5 w-5" />
-              <span class="text-sm">Summarize text</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <template v-if="selectedChat">
+        <Chat 
+          :messages="selectedChat.messages"
+          :message-statuses="messageStatuses"
+          :pending-message="newMessage"
+          :socket-client="socketClient"
+          :chat-id="selectedChat.id"
+          :selected-model="selectedModel"
+          @send="sendMessage"
+          @start-recording="startRecording"
+          @stop-recording="stopRecording"
+          @update-messages="updateMessages"
+        />
+      </template>
+      <template v-else>
+        <NewChat 
+          @create-chat="handleNewChat"
+          @start-recording="startRecording"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -310,6 +187,8 @@ import {
 import SocketClient from '../utils/socketClient'
 import { useUserStore } from '../store/userStore'
 import baseApi from '../utils/baseApi';
+import Chat from '../components/Chat.vue'
+import NewChat from '../components/NewChat.vue'
 
 // 2. State Management
 const userStore = useUserStore()
@@ -1388,6 +1267,23 @@ async function stopRecording() {
     console.log('Cleaning up recording state');
     isRecording.value = false;
     isProcessing.value = false;
+  }
+}
+
+async function handleNewChat({ initialMessage, isVoiceChat }) {
+  const newChat = await createNewChat()
+  if (initialMessage) {
+    newMessage.value = initialMessage
+    await nextTick()
+    sendMessage()
+  } else if (isVoiceChat) {
+    startRecording()
+  }
+}
+
+function updateMessages(newMessages) {
+  if (selectedChat.value) {
+    selectedChat.value.messages = newMessages
   }
 }
 

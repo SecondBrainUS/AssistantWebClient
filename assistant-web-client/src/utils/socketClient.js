@@ -106,12 +106,12 @@ class SocketClient {
     this.socket.emit("join_room", { room_id: roomid })
   }
 
-  sendMessage(roomid, message, userid, model) {
+  sendMessage(roomid, message, model) {
     if (!this.isConnected) {
       throw new Error("Socket is not connected. Call connect() first.")
     }
-    console.log("Sending message:", { room_id: roomid, message: message, userid: userid, model: model })
-    this.socket.emit("send_message", { room_id: roomid, message: message, userid: userid, model: model })
+    console.log("Sending message:", { room_id: roomid, message: message, model: model })
+    this.socket.emit("send_message", { room_id: roomid, message: message, model: model })
   }
 
   onMessage(callback) {
@@ -148,7 +148,7 @@ class SocketClient {
     }
   }
 
-  async createRoom(chatid) {
+  async createRoom(chatid, model) {
     if (!this.isConnected) {
       await this.connect()
     }
@@ -167,7 +167,7 @@ class SocketClient {
       })
 
       // Emit room creation request
-      this.socket.emit("create_room", { chat_id: chatid })
+      this.socket.emit("create_room", { chat_id: chatid, model: model })
     })
   }
 
@@ -206,7 +206,7 @@ class SocketClient {
     });
   }
 
-  async sendConversationItem(roomId, item, userId, model, chatId = null) {
+  async sendConversationItem(roomId, item, model, chatId = null) {
     if (!this.isConnected) {
       throw new Error("Socket is not connected. Call connect() first.");
     }
@@ -231,7 +231,6 @@ class SocketClient {
           data: { item },
           chat_id: chatId // Add chat_id if available
         },
-        userid: userId,
         model: model
       });
     });
