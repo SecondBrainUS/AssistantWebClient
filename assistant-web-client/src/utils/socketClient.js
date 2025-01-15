@@ -152,7 +152,7 @@ class SocketClient {
     if (!this.isConnected) {
       await this.connect()
     }
-    console.log("Creating room:", chatid)
+    console.log("Creating room for chat:", chatid)
     return new Promise((resolve, reject) => {
       // Set up one-time listener for room creation confirmation
       this.socket.once("room_created", (data) => {

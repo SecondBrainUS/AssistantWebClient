@@ -208,7 +208,7 @@ async function setupSocketHandlers() {
     
     // If we reconnect, try to rejoin the room
     if (status === 'connected') {
-      setupRoom()
+      rejoinChat();
     }
   })
 
@@ -244,13 +244,17 @@ async function setupSocketHandlers() {
       }
     }
   })
-
-  // Initial room setup
-  await setupRoom()
 }
 
-// Separate room setup logic for reuse
-async function setupRoom() {
+async function joinRoom() {
+	try {
+		await props.socketClient.joinRoom(props.roomid)
+	} catch (error) {
+		console.error('Error joining room:', error)
+	}
+}
+
+async function rejoinChat() {
   try {
     roomStatus.value = 'connecting'
     const roomData = await props.socketClient.findChat(props.chatid)
@@ -494,8 +498,9 @@ onMounted(async () => {
     }
   }
   
-  await setupSocketHandlers()
-  scrollToBottom()
+  await setupSocketHandlers();
+  await joinRoom();
+  scrollToBottom();
 })
 
 onUnmounted(() => {
