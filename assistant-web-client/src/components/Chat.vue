@@ -35,14 +35,14 @@
           <!-- Function call formatting -->
           <template v-if="message.role === 'system' && message.type === 'function_call'">
             <div class="font-mono">
-              <span class="text-blue-400">{{ message.name }}</span>
-              <span class="text-gray-400">(</span>
-              <span class="text-green-400">
+              <span style="color: #dcdc90">{{ message.name }}</span>
+              <span style="color: #f1d700">(</span>
+              <span style="color: #b670d6">
                 {
                 <template v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                  <span class="text-yellow-400">{{ key }}</span>
-                  <span class="text-gray-400">: </span>
-                  <span class="text-green-400">{{ 
+                  <span style="color: #9cdcfe">{{ key }}</span>
+                  <span style="color: #9cdcfe">: </span>
+                  <span style="color: #ce916a">{{ 
                     typeof value === 'object' ? 
                       JSON.stringify(value) : 
                       JSON.stringify(value) 
@@ -50,7 +50,7 @@
                 </template>
                 }
               </span>
-              <span class="text-gray-400">)</span>
+              <span style="color: #f1d700">)</span>
             </div>
           </template>
           <!-- Regular message content -->
@@ -124,33 +124,29 @@ import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import ChatInput from './ChatInput.vue'
 
 const props = defineProps({
-  messages: {
-    type: Array,
-    required: true
-  },
-  messageStatuses: {
-    type: Map,
-    required: true
-  },
-  pendingMessage: {
+  chatid: {
     type: String,
-    default: ''
+    required: true
+  },
+  roomid: {
+    type: String,
+    required: true
   },
   socketClient: {
     type: Object,
     required: true
   },
-  chatId: {
-    type: String,
-    required: true
-  },
   selectedModel: {
     type: Object,
     required: true
-  }
+  },
 })
 
-const emit = defineEmits(['send', 'startRecording', 'stopRecording', 'updateMessages'])
+const emit = defineEmits(['startRecording', 'stopRecording'])
+
+const messages = ref([])
+const messageStatuses = ref(new Map())
+const pendingMessage = ref('')
 
 const messagesContainer = ref(null)
 const socketStatus = ref('disconnected')
@@ -239,7 +235,7 @@ async function setupSocketHandlers() {
 
   // Message handler
   props.socketClient.onMessage((data) => {
-    if (data.room_id === props.chatId) {
+    if (data.room_id === props.roomid) {
       try {
         const eventData = JSON.parse(data.message)
         handleSocketMessage(eventData)
@@ -257,11 +253,11 @@ async function setupSocketHandlers() {
 async function setupRoom() {
   try {
     roomStatus.value = 'connecting'
-    const roomData = await props.socketClient.findChat(props.chatId)
+    const roomData = await props.socketClient.findChat(props.chatid)
     if (roomData.room_id) {
       await props.socketClient.joinRoom(roomData.room_id)
     } else {
-      const newRoomData = await props.socketClient.createRoom(props.chatId, props.selectedModel.name)
+      const newRoomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.name)
       await props.socketClient.joinRoom(newRoomData.room_id)
     }
   } catch (error) {
@@ -301,8 +297,8 @@ function handleTranscriptionComplete(eventData) {
     content: eventData.transcript,
     timestamp: new Date()
   }
-  emit('updateMessages', [...props.messages, transcriptMessage])
-  props.messageStatuses.set(eventData.item_id, 'sent')
+  messages.value.push(transcriptMessage)
+  messageStatuses.value.set(eventData.item_id, 'sent')
 }
 
 function handleTextDelta(eventData) {
@@ -313,10 +309,9 @@ function handleTextDelta(eventData) {
       content: eventData.delta,
       timestamp: new Date()
     }
-    emit('updateMessages', [...props.messages, currentAssistantMessage.value])
+    messages.value.push(currentAssistantMessage.value)
   } else {
     currentAssistantMessage.value.content += eventData.delta
-    emit('updateMessages', [...props.messages])
   }
 }
 
@@ -332,10 +327,9 @@ function handleAudioTranscriptDelta(eventData) {
       content: eventData.delta,
       timestamp: new Date()
     }
-    emit('updateMessages', [...props.messages, currentAssistantMessage.value])
+    messages.value.push(currentAssistantMessage.value)
   } else {
     currentAssistantMessage.value.content += eventData.delta
-    emit('updateMessages', [...props.messages])
   }
 }
 
@@ -442,7 +436,7 @@ async function handleSend(message) {
 
   const messageId = Date.now().toString()
   try {
-    props.messageStatuses.set(messageId, 'sending')
+    messageStatuses.value.set(messageId, 'sending')
     
     const newMessage = {
       id: messageId,
@@ -450,7 +444,7 @@ async function handleSend(message) {
       content: message,
       timestamp: new Date()
     }
-    emit('updateMessages', [...props.messages, newMessage])
+    messages.value.push(newMessage)
 
     const item = {
       id: messageId,
@@ -463,15 +457,15 @@ async function handleSend(message) {
     }
 
     await props.socketClient.sendConversationItem(
-      props.chatId, // TODO: change to room_id
+      props.chatid, // TODO: change to room_id
       item,
       props.selectedModel.name,
-      props.chatId
+      props.chatid
     )
 
-    props.messageStatuses.set(messageId, 'sent')
+    messageStatuses.value.set(messageId, 'sent')
 
-    await props.socketClient.sendMessage(props.chatId, {
+    await props.socketClient.sendMessage(props.chatid, {
       type: 'response.create',
       data: {
         response: {
@@ -483,7 +477,7 @@ async function handleSend(message) {
     })
   } catch (error) {
     console.error('Error sending message:', error)
-    props.messageStatuses.set(messageId, 'error')
+    messageStatuses.value.set(messageId, 'error')
   }
 }
 
