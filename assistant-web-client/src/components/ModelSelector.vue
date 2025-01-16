@@ -6,13 +6,13 @@
       class="flex items-center justify-between w-full px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
     >
       <div class="flex items-center space-x-2">
-        <span class="text-sm">{{ modelValue.display_name }}</span>
+        <span class="text-sm">{{ selectedModel?.display_name || 'Loading...' }}</span>
       </div>
       <ChevronDown class="h-4 w-4" :class="{ 'transform rotate-180': isOpen }" />
     </button>
 
     <!-- Dropdown menu -->
-    <div v-if="isOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
+    <div v-if="isOpen && selectedModel" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
       <div class="p-2 space-y-1">
         <div v-for="model in models" :key="model.model_id" class="p-2">
           <button 
@@ -53,24 +53,29 @@ import { onClickOutside } from '@vueuse/core'
 import { ChevronDown } from 'lucide-vue-next'
 import baseApi from '../utils/baseApi'
 
-const props = defineProps({
-  modelValue: {
-    type: Object,
-    required: true,
-    default: () => ({
-      model_id: '',
-      display_name: 'Loading...',
-      full_name: '',
-      description: 'Please wait...',
-      provider: ''
-    })
-  }
+// Define loading state model as a constant
+const LOADING_MODEL = Object.freeze({
+  model_id: -1, // Using -1 to clearly indicate this is not a real ID
+  display_name: 'Loading...',
+  full_name: '',
+  description: 'Please wait...',
+  provider: '',
+  isLoading: true // Helper flag to identify loading state
 })
 
-const emit = defineEmits(['update:modelValue'])
+const ERROR_MODEL = Object.freeze({
+  model_id: -2,
+  display_name: 'Error loading models',
+  full_name: '',
+  description: 'Please try again later',
+  provider: '',
+  isError: true
+})
 
 const isOpen = ref(false)
-const models = ref([])
+const models = ref([LOADING_MODEL])
+const selectedModelId = ref(null)
+const isLoading = ref(true)
 
 const toggles = ref([
   { id: 1, name: 'Temporary chat', enabled: false },
@@ -78,21 +83,37 @@ const toggles = ref([
   { id: 3, name: 'Code interpreter', enabled: false }
 ])
 
+const selectedModel = computed({
+  get: () => {
+    // Don't try to find loading model by ID
+    if (models.value.length === 1 && models.value[0].isLoading) {
+      return LOADING_MODEL
+    }
+    return models.value.find(m => m.model_id === selectedModelId.value) || models.value[0]
+  },
+  set: (model) => {
+    if (!model.isLoading) {
+      selectedModelId.value = model.model_id
+    }
+  }
+})
+
 function selectModel(model) {
-  emit('update:modelValue', model)
+  selectedModel.value = model
   isOpen.value = false
 }
 
 async function loadModels() {
+  isLoading.value = true
   try {
     const response = await baseApi.get('/model')
     models.value = response.data.models
-    // Set default model if none is selected
-    if (!props.modelValue?.model_id && models.value.length > 0) {
-      emit('update:modelValue', models.value[0])
-    }
+    selectedModel.value = models.value[0]
   } catch (error) {
     console.error('Error loading models:', error)
+    models.value = [ERROR_MODEL]
+  } finally {
+    isLoading.value = false
   }
 }
 

@@ -81,13 +81,6 @@
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col">
-      <!-- Model selector -->
-      <div class="p-4 border-b border-gray-700">
-        <ModelSelector
-          v-model="selectedModel"
-        />
-      </div>
-
       <!-- Chat area -->
       <template v-if="selectedChatId">
         <Chat 
@@ -95,7 +88,6 @@
           :initial-message="initialMessage"
           :socket-client="socketClient"
           :chatid="selectedChatId"
-          :selected-model="selectedModel"
           @notification="handleNotification"
         />
       </template>
@@ -120,7 +112,6 @@ import { useUserStore } from '../store/userStore'
 import baseApi from '../utils/baseApi';
 import Chat from '../components/Chat.vue'
 import NewChat from '../components/NewChat.vue'
-import ModelSelector from '../components/ModelSelector.vue'
 
 //=====================================
 // State Variables
@@ -133,7 +124,6 @@ const initialMessage = ref('')
 const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
-const isModelSelectorOpen = ref(false)
 const socketStatus = ref('disconnected')
 const showStatusTooltip = ref(false)
 const notifications = ref([])
@@ -142,12 +132,6 @@ const chatPage = ref(0)
 const hasMoreChats = ref(true)
 const chatsPerPage = 20
 const deleteHoverStates = ref({})
-
-const selectedModel = ref({
-  id: 0,
-  name: 'Loading...',
-  description: 'Please wait...'
-})
 
 const chatSections = ref([{ chats: [] }])
 const organizedChatSections = computed(() => {
@@ -257,14 +241,6 @@ async function createNewChat() {
 }
 
 onMounted(() => {
-  // Click outside handler
-  document.addEventListener('click', (e) => {
-    const dropdown = document.querySelector('.relative')
-    if (dropdown && !dropdown.contains(e.target)) {
-      isModelSelectorOpen.value = false
-    }
-  })
-  
   initializeWebSocket()
   
   // Initial chat load
