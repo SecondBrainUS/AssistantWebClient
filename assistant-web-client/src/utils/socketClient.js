@@ -155,14 +155,14 @@ class SocketClient {
     console.log("Creating room for chat:", chatid)
     return new Promise((resolve, reject) => {
       // Set up one-time listener for room creation confirmation
-      this.socket.once("room_created", (data) => {
-        console.log("Room creation confirmed:", data)
+      this.socket.once(`room_created ${chatid}`, (data) => {
+        console.log("[SOCKET] [CREATE ROOM] Room creation confirmed:", data)
         resolve(data)
       })
 
       // Set up one-time listener for room creation error
-      this.socket.once("room_error", (error) => {
-        console.error("Room creation failed:", error)
+      this.socket.once(`room_error ${chatid}`, (error) => {
+        console.error("[SOCKET] [CREATE ROOM] Room creation failed:", error)
         reject(error)
       })
 
@@ -175,18 +175,18 @@ class SocketClient {
     if (!this.isConnected) {
       await this.connect()
     }
-    console.log("Finding chat:", chatid)
+    console.log("[SOCKET] [FIND CHAT] Finding chat:", chatid)
     return new Promise((resolve, reject) => {
       // Set up one-time listener for room not found
       this.socket.once(`room_not_found ${chatid}`, (data) => {
-        console.log("Room not found for chat:", data)
-        resolve({room_id: null, chat_id: chatid})
+        console.log("[SOCKET] [FIND CHAT] Room not found for chat:", data)
+        resolve({roomid: null, chatid: chatid})
       })
 
       // Set up one-time listener for room found
       this.socket.once(`room_found ${chatid}`, (data) => {
-        console.log("Room found for chat:", data)
-        resolve({room_id: data.room_id, chat_id: chatid})
+        console.log("[SOCKET] [FIND CHAT] Room found for chat:", data)
+        resolve({roomid: data.room_id, chatid: chatid})
       })
 
       // Emit find chat request

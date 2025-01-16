@@ -155,24 +155,15 @@
       <!-- Chat area -->
       <template v-if="selectedChat">
         <Chat 
-          :messages="selectedChat.messages"
-          :message-statuses="messageStatuses"
-          :pending-message="newMessage"
+          :initial-message="initialMessage"
           :socket-client="socketClient"
           :chatid="selectedChat.chatid"
           :roomid="selectedChat.roomid"
           :selected-model="selectedModel"
-          @send="sendMessage"
-          @start-recording="startRecording"
-          @stop-recording="stopRecording"
-          @update-messages="updateMessages"
         />
       </template>
       <template v-else>
-        <NewChat 
-          @create-chat="handleNewChat"
-          @start-recording="startRecording"
-        />
+        <NewChat />
       </template>
     </div>
   </div>
@@ -191,41 +182,21 @@ import baseApi from '../utils/baseApi';
 import Chat from '../components/Chat.vue'
 import NewChat from '../components/NewChat.vue'
 
-// 2. State Management
+//=====================================
+// State Variables
+//=====================================
 const userStore = useUserStore()
 const socketClient = ref(null)
-const roomName = ref('user123-workspace-13212')
 const selectedChatId = ref(null)
-const newMessage = ref('')
+const selectedChat = ref(null)
+const initialMessage = ref('')
 const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
 const isModelSelectorOpen = ref(false)
-const websocket = ref(null)
-const messageStatuses = ref(new Map())
-const currentAssistantMessage = ref(null)
-const audioContext = ref(null)
-const audioQueue = ref([])
-const isPlaying = ref(false)
-const currentSource = ref(null)
-const nextPlayTime = ref(0)
-const mediaRecorder = ref(null);
-const isRecording = ref(false);
-const audioProcessor = ref(null);
-const micStream = ref(null);
-const isProcessing = ref(false);
-const startingMessage = ref('Start a new chat!');
-const quote = ref([
-  '"This has pulp", "You like pulp!", "I LIKE SOME PULP!" - Tony and Carmella',
-    'I was trying to say something positive cause she\'s your friend'
-  ][Math.floor(Math.random() * 2)]
-);
 const socketStatus = ref('disconnected')
 const showStatusTooltip = ref(false)
-const messageQueue = ref([])
 const notifications = ref([])
-const roomStatus = ref('disconnected')
-const showRoomStatusTooltip = ref(false)
 const chatIds = ref(new Map()); // Map to store room_id -> chat_id mappings
 const isLoadingChats = ref(false)
 const chatPage = ref(0)
@@ -233,7 +204,6 @@ const hasMoreChats = ref(true)
 const chatsPerPage = 20
 const deleteHoverStates = ref({})
 
-// 3. Data Definitions
 const models = ref([
   {
     id: 1,
@@ -334,12 +304,6 @@ const filteredChatSections = computed(() => {
   })).filter(section => section.chats.length > 0)
 })
 
-const selectedChat = computed(() => {
-  return chatSections.value
-    .flatMap(section => section.chats)
-    .find(chat => chat.chatid === selectedChatId.value)
-})
-
 const socketStatusMessage = computed(() => {
   switch (socketStatus.value) {
     case 'connected':
@@ -369,155 +333,66 @@ async function initializeWebSocket() {
 
     await socketClient.value.connect()
 
-    // Handle Room Created
-    // TODO: how do we hook into these when creating a new chat or loading an existing chat?
-    socketClient.value.onRoomCreated((data) => {
-      console.log("Room created:", data)
-    })
-
-    // Handle Chat Created
-    socketClient.value.onChatCreated((chatId) => {
-      console.log("Chat created with ID:", chatId);
-      if (selectedChat.value) {
-        chatIds.value.set(selectedChat.value.chatid, chatId);
-      }
-    });
-
   } catch (error) {
     console.error("Failed to initialize WebSocket:", error)
     socketStatus.value = 'disconnected'
   }
 }
 
-async function selectChat(chatId) {
-  selectedChatId.value = chatId
-  
-  try {
-    // Load messages for the selected chat
-    const messages = await baseApi.get(`/chat/${chatId}/messages`)
-    
-    // Find and update the selected chat's messages
-    const chat = chatSections.value[0].chats.find(c => c.chatid === chatId)
-    if (chat) {
-      chat.messages = messages.data.map(msg => ({
-        ...msg,
-        id: msg.message_id,
-        timestamp: new Date(msg.created_timestamp)
-      }))
-
-      // Find or create room for this chat
-      if (socketClient.value) {
-        try {
-          const roomData = await socketClient.value.findChat(chatId)
-          if (roomData.room_id) {
-            // Store the room ID with the chat
-            chat.roomId = roomData.room_id
-            await socketClient.value.joinRoom(roomData.room_id)
-            console.log("Room found/created for chat:", roomData)
-          } else {
-            // Create room
-            const roomData = await socketClient.value.createRoom(chatId);
-            // Store the room ID with the chat
-            chat.roomId = roomData.room_id
-            console.log("Room created for chat:", roomData)
-          }
-          
-          // Reset current assistant message when switching chats
-          currentAssistantMessage.value = null
-          
-          // Set up message handler for this chat
-          socketClient.value.onMessage((data) => {
-            console.log("Received message:", data)
-            if (selectedChat.value && data.room_id === selectedChat.value.roomId) {
-              try {
-                const eventData = JSON.parse(data.message)
-                
-                switch (eventData.type) {
-                  case 'conversation.item.input_audio_transcription.completed':
-                    // Add transcribed message to chat
-                    const transcriptMessage = {
-                      id: eventData.item_id,
-                      role: 'user',
-                      content: eventData.transcript,
-                      timestamp: new Date()
-                    }
-                    selectedChat.value.messages.push(transcriptMessage)
-                    messageStatuses.value.set(eventData.item_id, 'sent')
-                    break
-                    
-                  case 'response.text.delta':
-                    if (!currentAssistantMessage.value) {
-                      currentAssistantMessage.value = {
-                        id: Date.now().toString(),
-                        role: 'assistant',
-                        content: eventData.delta,
-                        timestamp: new Date()
-                      }
-                      selectedChat.value.messages.push(currentAssistantMessage.value)
-                    } else {
-                      // Append to existing message
-                      currentAssistantMessage.value.content += eventData.delta
-                    }
-                    break
-
-                  case 'response.audio.delta':
-                    // Handle incoming audio chunk
-                    playAudioBuffer(eventData.delta)
-                    break
-
-                  case 'response.audio_transcript.delta':
-                    // If this is the first chunk of the response, create a new message
-                    if (!currentAssistantMessage.value) {
-                      currentAssistantMessage.value = {
-                        id: Date.now().toString(),
-                        role: 'assistant',
-                        content: eventData.delta,
-                        timestamp: new Date()
-                      }
-                      selectedChat.value.messages.push(currentAssistantMessage.value)
-                    } else {
-                      // Append to existing message
-                      currentAssistantMessage.value.content += eventData.delta
-                    }
-                    break
-
-                  case 'response.audio_transcript.done':
-                  case 'response.done':
-                    // Reset for next message
-                    currentAssistantMessage.value = null
-                    break
-                }
-
-                // Scroll to bottom on new content
-                nextTick(() => {
-                  const chatArea = document.querySelector('.flex-1.p-4.overflow-y-auto')
-                  if (chatArea) chatArea.scrollTop = chatArea.scrollHeight
-                })
-              } catch (error) {
-                console.error('Error processing message:', error)
-              }
-            }
-          })
-          
-        } catch (error) {
-          console.error('Error finding/creating room for chat:', error)
-          notifications.value.push({
-            type: 'error',
-            message: 'Failed to connect to chat room',
-            id: Date.now()
-          })
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error loading chat messages:', error)
+async function selectChat(chatid) {
+  // Check if socket client is initialized
+  if (!socketClient.value){
+    console.error("[WORKSPACE] [SELECT CHAT] Socket client not initialized");
     notifications.value.push({
       type: 'error',
-      message: 'Failed to load chat messages',
+      message: 'Connection to server not available.',
+      id: Date.now()
+    })
+    return;
+  }
+
+  // Set selected chatid
+  selectedChatId.value = chatid;
+  await nextTick();
+
+  // Find or create room for this chat
+  try {
+    const roomData = await socketClient.value.findChat(chatid)
+    let roomid = null;
+    if (roomData.roomid) {
+      console.log("[WORKSPACE] [SELECT CHAT] Room found/created for chat:", roomData)
+      roomid = roomData.roomid
+    } else {
+      // Create room
+      const roomData = await socketClient.value.createRoom(chatid);
+      console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
+      roomid = roomData.roomid
+    }
+    if (!roomid) {
+      console.error("[WORKSPACE] [SELECT CHAT] Failed to find/create room for chat:", chatid)
+      notifications.value.push({
+        type: 'error',
+        message: 'Failed to connect to chat room',
+        id: Date.now()
+      })
+      return;
+    }
+  } catch (error) {
+    console.error("[WORKSPACE] [SELECT CHAT] Error finding/creating room for chat:", error)
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to connect to chat room',
       id: Date.now()
     })
   }
+
+  // Set selected chat
+  selectedChat.value = {
+    roomid: roomid,
+    chatid: chatid
+  };
 }
+
 
 async function handleNewChat({ initialMessage, isVoiceChat }) {
   const newChat = await createNewChat()
@@ -578,12 +453,12 @@ async function createNewChat() {
     chatSections.value[0].chats.unshift(newChat)
     
     // Select the new chat
-    selectChat(newChatId)
+    selectChat(newChat.chatid)
 
     // Create and join room in socket server
     if (socketClient.value) {
-      console.log("Creating room for new chat:", newChatId)
-      const roomData = await socketClient.value.createRoom(newChatId)
+      console.log("Creating room for new chat:", newChatId.chatid)
+      const roomData = await socketClient.value.createRoom(newChat.chatid)
       // Store the room ID with the chat
       newChat.roomId = roomData.room_id
       console.log("Room creation confirmed, roomId:", newChat.roomId)
