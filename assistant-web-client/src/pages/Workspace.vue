@@ -149,6 +149,53 @@ const selectedModel = ref({
   description: 'Please wait...'
 })
 
+const chatSections = ref([{ chats: [] }])
+const organizedChatSections = computed(() => {
+  const allChats = chatSections.value.flatMap(section => section.chats)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const weekAgo = new Date(today)
+  weekAgo.setDate(weekAgo.getDate() - 7)
+  const sections = [
+    {
+      title: 'Today',
+      chats: allChats
+        .filter(chat => chat.timestamp >= today)
+        .sort((a, b) => b.timestamp - a.timestamp)
+    },
+    {
+      title: 'Yesterday',
+      chats: allChats
+        .filter(chat => chat.timestamp >= yesterday && chat.timestamp < today)
+        .sort((a, b) => b.timestamp - a.timestamp)
+    },
+    {
+      title: 'Previous 7 Days',
+      chats: allChats
+        .filter(chat => chat.timestamp >= weekAgo && chat.timestamp < yesterday)
+        .sort((a, b) => b.timestamp - a.timestamp)
+    },
+    {
+      title: 'Older',
+      chats: allChats
+        .filter(chat => chat.timestamp < weekAgo)
+        .sort((a, b) => b.timestamp - a.timestamp)
+    }
+  ]
+  return sections.filter(section => section.chats.length > 0)
+})
+const filteredChatSections = computed(() => {
+  if (!searchQuery.value) return organizedChatSections.value
+  return organizedChatSections.value.map(section => ({
+    ...section,
+    chats: section.chats.filter(chat => 
+      chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
+    )
+  })).filter(section => section.chats.length > 0)
+})
+
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
 

@@ -6,7 +6,7 @@
       class="flex items-center justify-between w-full px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
     >
       <div class="flex items-center space-x-2">
-        <span class="text-sm">{{ modelValue.name }}</span>
+        <span class="text-sm">{{ modelValue.display_name }}</span>
       </div>
       <ChevronDown class="h-4 w-4" :class="{ 'transform rotate-180': isOpen }" />
     </button>
@@ -14,12 +14,12 @@
     <!-- Dropdown menu -->
     <div v-if="isOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
       <div class="p-2 space-y-1">
-        <div v-for="model in models" :key="model.id" class="p-2">
+        <div v-for="model in models" :key="model.model_id" class="p-2">
           <button 
             @click="selectModel(model)"
             class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
           >
-            <div class="text-sm font-medium">{{ model.name }}</div>
+            <div class="text-sm font-medium">{{ model.display_name }}</div>
             <div class="text-xs text-gray-400">{{ model.description }}</div>
           </button>
         </div>
@@ -48,21 +48,28 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onClickOutside } from '@vueuse/core'
+import { ref, computed, onMounted } from 'vue'
+import { onClickOutside } from '@vueuse/core'
 import { ChevronDown } from 'lucide-vue-next'
 import baseApi from '../utils/baseApi'
 
 const props = defineProps({
   modelValue: {
     type: Object,
-    required: true
+    required: true,
+    default: () => ({
+      model_id: '',
+      display_name: 'Loading...',
+      full_name: '',
+      description: 'Please wait...',
+      provider: ''
+    })
   }
 })
 
 const emit = defineEmits(['update:modelValue'])
 
 const isOpen = ref(false)
-const showStatusTooltip = ref(false)
 const models = ref([])
 
 const toggles = ref([
@@ -78,8 +85,12 @@ function selectModel(model) {
 
 async function loadModels() {
   try {
-    const response = await baseApi.get('/models')
-    models.value = response.data
+    const response = await baseApi.get('/model')
+    models.value = response.data.models
+    // Set default model if none is selected
+    if (!props.modelValue?.model_id && models.value.length > 0) {
+      emit('update:modelValue', models.value[0])
+    }
   } catch (error) {
     console.error('Error loading models:', error)
   }
