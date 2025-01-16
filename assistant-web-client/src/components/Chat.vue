@@ -29,15 +29,13 @@
               <span style="color: #dcdc90">{{ message.name }}</span>
               <span style="color: #f1d700">(</span>
               <span style="color: #b670d6">
-                <template v-if="Object.keys(JSON.parse(message.arguments)).length > 0">
-                  {
-                  <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                    <span style="color: #9cdcfe">{{ key }}</span>
-                    <span style="color: #9cdcfe">: </span>
-                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
-                  </span>
-                  }
-                </template>
+                {
+                <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
+                  <span style="color: #9cdcfe">{{ key }}</span>
+                  <span style="color: #9cdcfe">: </span>
+                  <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
+                </span>
+                }
               </span>
               <span style="color: #f1d700">)</span>
             </div>
