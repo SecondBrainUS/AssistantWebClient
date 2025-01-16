@@ -1,5 +1,12 @@
 <template>
   <div class="h-full flex flex-col overflow-hidden">
+    <!-- Model selector -->
+    <div class="p-4 border-b border-gray-700">
+      <ModelSelector
+        ref="modelSelector"
+        @update:modelValue="handleModelChange"
+      />
+    </div>
     <!-- Chat messages -->
     <div class="flex-1 p-4 overflow-y-auto" ref="messagesContainer">
       <div v-for="message in messages" 
@@ -122,6 +129,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import ChatInput from './ChatInput.vue'
+import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
 
 const props = defineProps({
@@ -133,10 +141,10 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  selectedModel: {
-    type: Object,
-    required: true
-  },
+  initialMessage: {
+    type: String,
+    default: null
+  }
 })
 
 const roomid = ref(null)
@@ -145,6 +153,9 @@ const messageStatuses = ref(new Map())
 
 const pendingMessage = ref('')
 const currentAssistantMessage = ref(null)
+
+const modelSelector = ref(null)
+const selectedModel = ref(null)
 
 const messagesContainer = ref(null)
 const socketStatus = ref('disconnected')
@@ -237,17 +248,17 @@ async function setupSocketHandlers() {
     roomStatus.value = 'connected'
   })
 
-  props.socketClient.onRoomJoined((data) => {
+  props.socketClient.onRoomJoined(roomid.value, (data) => {
     console.log("Joined room:", data)
     roomStatus.value = 'connected'
   })
 
-  props.socketClient.onRoomError((data) => {
+  props.socketClient.onRoomError(roomid.value, (data) => {
     console.error("Room error:", data)
     roomStatus.value = 'error'
   })
 
-  props.socketClient.onRoomLeft((data) => {
+  props.socketClient.onRoomLeft(roomid.value, (data) => {
     console.log("Left room:", data)
     roomStatus.value = 'disconnected'
   })
@@ -275,7 +286,7 @@ async function findRoom() {
       roomid = roomData.roomid
     } else {
       // Create room
-      const roomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.full_name);
+      const roomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id);
       console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
       roomid = roomData.roomid
     }
@@ -330,7 +341,7 @@ async function rejoinChat() {
     if (roomData.room_id) {
       await props.socketClient.joinRoom(roomData.room_id)
     } else {
-      const newRoomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.full_name)
+      const newRoomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id)
       await props.socketClient.joinRoom(newRoomData.room_id)
     }
   } catch (error) {
@@ -538,7 +549,7 @@ async function handleSend(message) {
     await props.socketClient.sendConversationItem(
       roomid.value,
       item,
-      props.selectedModel.full_name,
+      selectedModel.value.model_id,
       props.chatid
     )
 
@@ -560,6 +571,48 @@ async function handleSend(message) {
   }
 }
 
+function handleModelChange(model) {
+  selectedModel.value = model
+  console.log("Selected model:", selectedModel.value)
+}
+
+async function loadChat() {
+  try {
+    const chatData = await baseApi.get(`/chat/${props.chatid}`)
+    console.log("Chat data:", chatData)
+    if (!chatData.data) {
+      console.error("Chat data not found")
+      return;
+    }
+    if (!chatData.data.current_model_id) {
+      console.error("Current model ID not found")
+      return;
+    }
+    // Wait for next tick to ensure ModelSelector is mounted
+    await nextTick()
+    if (!modelSelector.value) {
+      console.error("ModelSelector not found")
+      return;
+    }
+    const success = modelSelector.value.selectModelById(chatData.data.current_model_id)
+    if (!success) {
+      console.error('Failed to select model:', chatData.data.current_model_id)
+      emit('notification', {
+        type: 'error',
+        message: 'Failed to select chat model',
+        id: Date.now()
+      })
+    }
+  } catch (error) {
+    console.error('Error loading chat:', error)
+    emit('notification', {
+      type: 'error',
+      message: 'Failed to load chat',
+      id: Date.now()
+    })
+  }
+}
+
 // Lifecycle hooks
 onMounted(async () => {
   // If socket isn't connected, connect it
@@ -572,11 +625,21 @@ onMounted(async () => {
       return
     }
   }
+ 
+  await loadChat();
   await loadChatMessages();
   const newRoomId = await findRoom();
   roomid.value = newRoomId;
   await setupSocketHandlers();
   await joinRoom();
+  await nextTick();
+  console.log("Initial message:", props.initialMessage)
+  // Send initial message if provided
+  if (props.initialMessage) {
+    console.log("Sending initial message:", props.initialMessage)
+    await handleSend(props.initialMessage);
+  }
+  
   scrollToBottom();
 })
 
@@ -586,7 +649,7 @@ onUnmounted(() => {
     props.socketClient.onStatusChange(null)
     props.socketClient.onMessage(null)
     props.socketClient.onRoomCreated(null)
-    props.socketClient.onRoomJoined(null)
+    props.socketClient.onRoomJoined(roomid.value, null)
     props.socketClient.onRoomError(null)
     props.socketClient.onRoomLeft(null)
   }

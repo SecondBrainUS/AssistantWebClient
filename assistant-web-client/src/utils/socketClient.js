@@ -103,15 +103,30 @@ class SocketClient {
       await this.connect()
     }
     console.log("Joining room:", roomid)
-    this.socket.emit("join_room", { room_id: roomid })
+    return new Promise((resolve, reject) => {
+      // Set up one-time listener for room join confirmation
+      this.socket.once(`room_joined ${roomid}`, (data) => {
+        console.log("[SOCKET] [JOIN ROOM] Room join confirmed:", data)
+        resolve(data)
+      })
+
+      // Set up one-time listener for room join error
+      this.socket.once(`room_join_error ${roomid}`, (error) => {
+        console.error("[SOCKET] [JOIN ROOM] Room join failed:", error)
+        reject(error)
+      })
+
+      // Emit room join request
+      this.socket.emit("join_room", { room_id: roomid })
+    })
   }
 
-  sendMessage(roomid, message, model) {
+  sendMessage(roomid, message, modelid) {
     if (!this.isConnected) {
       throw new Error("Socket is not connected. Call connect() first.")
     }
-    console.log("Sending message:", { room_id: roomid, message: message, model: model })
-    this.socket.emit("send_message", { room_id: roomid, message: message, model: model })
+    console.log("Sending message:", { room_id: roomid, message: message, model_id: modelid })
+    this.socket.emit("send_message", { room_id: roomid, message: message, model_id: modelid })
   }
 
   onMessage(callback) {
@@ -130,9 +145,10 @@ class SocketClient {
     this.socket.on("room_created", callback);
   }
 
-  onRoomJoined(callback) {
-    this.socket.off("room_joined");
-    this.socket.on("room_joined", callback);
+  onRoomJoined(roomid, callback) {
+    const eventName = `room_joined ${roomid}`;
+    this.socket.off(eventName);
+    this.socket.on(eventName, callback);
   }
 
   onRoomLeft(callback) {
@@ -148,7 +164,7 @@ class SocketClient {
     }
   }
 
-  async createRoom(chatid, model) {
+  async createRoom(chatid, modelid) {
     if (!this.isConnected) {
       await this.connect()
     }
@@ -157,7 +173,7 @@ class SocketClient {
       // Set up one-time listener for room creation confirmation
       this.socket.once(`room_created ${chatid}`, (data) => {
         console.log("[SOCKET] [CREATE ROOM] Room creation confirmed:", data)
-        resolve(data)
+        resolve({roomid: data.room_id, chatid: chatid, model_id: data.model_id})
       })
 
       // Set up one-time listener for room creation error
@@ -167,7 +183,7 @@ class SocketClient {
       })
 
       // Emit room creation request
-      this.socket.emit("create_room", { chat_id: chatid, model: model })
+      this.socket.emit("create_room", { chat_id: chatid, model_id: modelid })
     })
   }
 
@@ -206,7 +222,7 @@ class SocketClient {
     });
   }
 
-  async sendConversationItem(roomId, item, model, chatId = null) {
+  async sendConversationItem(roomId, item, modelid, chatId = null) {
     if (!this.isConnected) {
       throw new Error("Socket is not connected. Call connect() first.");
     }
@@ -229,9 +245,9 @@ class SocketClient {
         message: {
           type: "conversation.item.create",
           data: { item },
-          chat_id: chatId // Add chat_id if available
+          chat_id: chatId
         },
-        model: model
+        model_id: modelid
       });
     });
   }

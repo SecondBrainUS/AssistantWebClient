@@ -53,14 +53,22 @@ import { onClickOutside } from '@vueuse/core'
 import { ChevronDown } from 'lucide-vue-next'
 import baseApi from '../utils/baseApi'
 
-// Define loading state model as a constant
+const props = defineProps({
+  modelid: {
+    type: String,
+    default: null
+  }
+})
+
+const emit = defineEmits(['update:modelValue', 'modelsLoaded'])
+
 const LOADING_MODEL = Object.freeze({
-  model_id: -1, // Using -1 to clearly indicate this is not a real ID
+  model_id: -1,
   display_name: 'Loading...',
   full_name: '',
   description: 'Please wait...',
   provider: '',
-  isLoading: true // Helper flag to identify loading state
+  isLoading: true
 })
 
 const ERROR_MODEL = Object.freeze({
@@ -98,9 +106,11 @@ const selectedModel = computed({
   }
 })
 
+
 function selectModel(model) {
   selectedModel.value = model
   isOpen.value = false
+  emit('update:modelValue', model)
 }
 
 async function loadModels() {
@@ -108,13 +118,36 @@ async function loadModels() {
   try {
     const response = await baseApi.get('/model')
     models.value = response.data.models
-    selectedModel.value = models.value[0]
+    
+    // If modelId prop is provided, select that model
+    if (props.modelid) {
+      const model = models.value.find(m => m.model_id === props.modelid)
+      if (model) {
+        selectModel(model)
+      }
+    } else {
+      selectModel(models.value[0])
+    }
+    
+    // Emit models loaded event with all models
+    emit('modelsLoaded', models.value)
   } catch (error) {
     console.error('Error loading models:', error)
     models.value = [ERROR_MODEL]
   } finally {
     isLoading.value = false
   }
+}
+
+function selectModelById(modelid) {
+  console.log("Selecting model by ID:", modelid)
+  const model = models.value.find(m => m.model_id === modelid)
+  if (!model) {
+    console.error("Model not found")
+    return false
+  }
+  selectModel(model)
+  return true
 }
 
 const dropdownRef = ref(null)
@@ -125,5 +158,10 @@ onClickOutside(dropdownRef, () => {
 
 onMounted(() => {
   loadModels()
+})
+
+// Expose method to parent
+defineExpose({
+  selectModelById
 })
 </script>

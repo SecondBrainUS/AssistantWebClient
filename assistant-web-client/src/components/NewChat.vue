@@ -3,7 +3,7 @@
     <!-- Model selector -->
     <div class="p-4 border-b border-gray-700">
       <ModelSelector
-        v-model="selectedModel"
+        @update:modelValue="handleModelChange"
       />
     </div>
     <div class="flex-1 flex items-center justify-center">
@@ -11,16 +11,12 @@
         <h1 class="text-3xl font-semibold text-gray-300">Start a New Chat</h1>
       </div>
     </div>
-
-
-    
     <div class="p-4">
       <div class="max-w-3xl mx-auto">
         <ChatInput 
           placeholder="Type to start a new chat..."
           @send="handleNewChat"
           @startRecording="handleStartRecording"
-          @stopRecording="handleStopRecording"
         />
       </div>
     </div>
@@ -28,25 +24,44 @@
 </template>
 
 <script setup>
-import { defineEmits } from 'vue'
+import { defineEmits, ref } from 'vue'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
 
-const emit = defineEmits(['createChat', 'startRecording'])
+const emit = defineEmits(['createChat', 'startRecording', 'notification'])
 
-function handleNewChat(message) {
-  // API call to create a new chat
+const selectedModel = ref(null)
 
-  emit('createChat', { initialMessage: message })
+function handleModelChange(model) {
+  selectedModel.value = model
 }
 
-function handleStartRecording() {
-  emit('createChat', { startRecording: true })
+async function handleNewChat(message) {
+  const chatid = await createNewChat();
+  emit('createChat', { chatid: chatid, modelid: selectedModel.value.model_id, initialMessage: message })
+}
+
+async function handleStartRecording() {
+  const chatid = await createNewChat();
+  emit('createChat', { chatid: chatid, modelid: selectedModel.value.model_id, startRecording: true })
 }
 
 async function createNewChat() {
-  // Need model
-  const newChat = await baseApi.post('/chat', { })
+  if (!selectedModel.value) {
+    console.error('No model selected');
+    emit('notification', { message: 'No model selected', type: 'error' });
+    return null;
+  }
+  try {
+    const newChat = await baseApi.post('/chat', { 
+      model_id: selectedModel.value.model_id,
+    })
+    return newChat.data.chat_id;
+  } catch (error) {
+    console.error('Error creating new chat:', error)
+    emit('notification', { message: 'Error creating new chat', type: 'error' });
+    return null;
+  }
 }
 </script>

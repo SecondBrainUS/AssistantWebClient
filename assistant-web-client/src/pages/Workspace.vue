@@ -1,5 +1,21 @@
 <template>
   <div class="h-full bg-gray-700 text-gray-100 flex">
+    <!-- Notifications -->
+    <div class="fixed top-4 right-4 z-50 space-y-2">
+      <div
+        v-for="notification in notifications"
+        :key="notification.id"
+        class="p-4 rounded shadow-lg transition-all duration-300 transform"
+        :class="{
+          'bg-red-500': notification.type === 'error',
+          'bg-green-500': notification.type === 'success',
+          'bg-blue-500': notification.type === 'info'
+        }"
+      >
+        {{ notification.message }}
+      </div>
+    </div>
+
     <!-- Sidebar -->
     <div 
       :class="[
@@ -85,15 +101,16 @@
       <template v-if="selectedChatId">
         <Chat 
           :key="selectedChatId"
-          :initial-message="initialMessage"
           :socket-client="socketClient"
           :chatid="selectedChatId"
+          :initial-message="pendingInitialMessage"
           @notification="handleNotification"
         />
       </template>
       <template v-else>
         <NewChat 
           @createChat="createNewChat"
+          @notification="handleNotification"
         />
       </template>
     </div>
@@ -102,7 +119,7 @@
 
 <script setup>
 // 1. Imports
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { 
   Menu, Search, PenSquare, MessageSquare,
   Send, Image, PenLine, HelpCircle, FileText, Mic, Square, Trash2, TrashIcon
@@ -120,7 +137,6 @@ const userStore = useUserStore()
 const socketClient = ref(null)
 const selectedChatId = ref(null)
 const selectedChat = ref(null)
-const initialMessage = ref('')
 const isSidebarOpen = ref(true)
 const isSearchOpen = ref(false)
 const searchQuery = ref('')
@@ -180,6 +196,8 @@ const filteredChatSections = computed(() => {
   })).filter(section => section.chats.length > 0)
 })
 
+const pendingInitialMessage = ref(null)
+
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
 
@@ -233,12 +251,47 @@ function filterChats() {
 
 async function onNewChat() {
   selectedChatId.value = null;
-  initialMessage.value = '';
 }
 
-async function createNewChat() {
+async function createNewChat({ chatid, modelid, initialMessage, startRecording }) {
+  if (!chatid) return;
+  console.log("Creating new chat:", chatid, modelid, initialMessage, startRecording)
 
+  try {
+    // Add the new chat to the UI immediately
+    const newChat = {
+      chatid: chatid,
+      title: `Chat ${chatid.slice(0, 8)}`,
+      timestamp: new Date(),
+      messages: []
+    }
+
+    // Add to beginning of first section's chats
+    if (chatSections.value.length === 0) {
+      chatSections.value.push({ chats: [] })
+    }
+    chatSections.value[0].chats.unshift(newChat)
+
+    // Set pending initial message if provided
+    pendingInitialMessage.value = initialMessage
+    await nextTick();
+
+    // Set as selected chat
+    selectedChatId.value = chatid
+  } catch (error) {
+    console.error('Error creating new chat:', error)
+    notifications.value.push({
+      type: 'error',
+      message: 'Failed to create new chat',
+      id: Date.now()
+    })
+  }
 }
+
+// Add watcher to clear pendingInitialMessage when chat changes
+watch(selectedChatId, () => {
+  pendingInitialMessage.value = null
+})
 
 onMounted(() => {
   initializeWebSocket()
@@ -349,11 +402,22 @@ async function confirmDeleteChat(chatId) {
 }
 
 function handleNotification(notification) {
+  // Default durations based on notification type
+  const durations = {
+    error: 8000,
+    success: 3000,
+    info: 5000
+  }
+  
+  // Use the notification's custom duration if provided, otherwise use the default for its type
+  const duration = notification.duration || durations[notification.type] || 5000
+  
   notifications.value.push(notification)
-  // Optionally auto-remove notification after a delay
+  
+  // Create unique timeout for this notification
   setTimeout(() => {
     notifications.value = notifications.value.filter(n => n.id !== notification.id)
-  }, 5000)
+  }, duration)
 }
 </script>
 
