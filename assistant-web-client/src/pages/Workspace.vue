@@ -356,17 +356,17 @@ async function selectChat(chatid) {
   await nextTick();
 
   // Find or create room for this chat
+  let roomid = null;
   try {
     const roomData = await socketClient.value.findChat(chatid)
-    let roomid = null;
-    if (roomData.roomid) {
+    if (roomData.room_id) {
       console.log("[WORKSPACE] [SELECT CHAT] Room found/created for chat:", roomData)
-      roomid = roomData.roomid
+      roomid = roomData.room_id
     } else {
       // Create room
-      const roomData = await socketClient.value.createRoom(chatid);
+      const roomData = await socketClient.value.createRoom(chatid, selectedModel.value.name);
       console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
-      roomid = roomData.roomid
+      roomid = roomData.room_id
     }
     if (!roomid) {
       console.error("[WORKSPACE] [SELECT CHAT] Failed to find/create room for chat:", chatid)
