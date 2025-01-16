@@ -615,6 +615,9 @@ async function loadChat() {
 
 // Lifecycle hooks
 onMounted(async () => {
+  // Add debug logging
+  console.log("Chat mounted. Initial message:", props.initialMessage)
+  
   // If socket isn't connected, connect it
   if (!props.socketClient.isConnected) {
     try {
@@ -633,7 +636,7 @@ onMounted(async () => {
   await setupSocketHandlers();
   await joinRoom();
   await nextTick();
-  console.log("Initial message:", props.initialMessage)
+  
   // Send initial message if provided
   if (props.initialMessage) {
     console.log("Sending initial message:", props.initialMessage)

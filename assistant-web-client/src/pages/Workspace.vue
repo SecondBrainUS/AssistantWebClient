@@ -288,9 +288,17 @@ async function createNewChat({ chatid, modelid, initialMessage, startRecording }
   }
 }
 
-// Add watcher to clear pendingInitialMessage when chat changes
-watch(selectedChatId, () => {
-  pendingInitialMessage.value = null
+// Add this debug watch to help track the value
+watch(pendingInitialMessage, (newVal) => {
+  console.log("pendingInitialMessage changed:", newVal)
+})
+
+// Modify the watcher to only clear on specific conditions
+watch(selectedChatId, (newId, oldId) => {
+  // Only clear if we're moving away from a chat, not when initially selecting one
+  if (oldId !== null) {
+    pendingInitialMessage.value = null
+  }
 })
 
 onMounted(() => {
