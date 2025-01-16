@@ -153,12 +153,11 @@
       </div>
 
       <!-- Chat area -->
-      <template v-if="selectedChat">
+      <template v-if="selectedChatId">
         <Chat 
           :initial-message="initialMessage"
           :socket-client="socketClient"
-          :chatid="selectedChat.chatid"
-          :roomid="selectedChat.roomid"
+          :chatid="selectedChatId"
           :selected-model="selectedModel"
           @notification="handleNotification"
         />
@@ -353,12 +352,6 @@ async function selectChat(chatid) {
 
   // Set selected chatid
   selectedChatId.value = chatid;
-
-  // Set selected chat
-  selectedChat.value = {
-    roomid: roomid,
-    chatid: chatid
-  };
 }
 
 async function handleNewChat({ initialMessage, isVoiceChat }) {
