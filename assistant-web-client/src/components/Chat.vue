@@ -275,7 +275,7 @@ async function findRoom() {
       roomid = roomData.room_id
     } else {
       // Create room
-      const roomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.name);
+      const roomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.full_name);
       console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
       roomid = roomData.room_id
     }
@@ -330,7 +330,7 @@ async function rejoinChat() {
     if (roomData.room_id) {
       await props.socketClient.joinRoom(roomData.room_id)
     } else {
-      const newRoomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.name)
+      const newRoomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.full_name)
       await props.socketClient.joinRoom(newRoomData.room_id)
     }
   } catch (error) {
@@ -538,7 +538,7 @@ async function handleSend(message) {
     await props.socketClient.sendConversationItem(
       roomid.value,
       item,
-      props.selectedModel.name,
+      props.selectedModel.full_name,
       props.chatid
     )
 
