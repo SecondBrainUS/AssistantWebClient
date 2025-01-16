@@ -22,20 +22,22 @@
 <script setup>
 import { defineEmits } from 'vue'
 import ChatInput from './ChatInput.vue'
+import baseApi from '../utils/baseApi';
 
 const emit = defineEmits(['createChat', 'startRecording'])
 
 function handleNewChat(message) {
+  // API call to create a new chat
+
   emit('createChat', { initialMessage: message })
 }
 
 function handleStartRecording() {
-  emit('startRecording')
+  emit('createChat', { startRecording: true })
 }
 
-function handleStopRecording() {
-  // This will be handled by the parent since it needs to create
-  // a new chat and transition to it
-  emit('createChat', { isVoiceChat: true })
+async function createNewChat() {
+  // Need model
+  const newChat = await baseApi.post('/chat', { })
 }
 </script>

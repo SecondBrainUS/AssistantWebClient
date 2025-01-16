@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full flex flex-col overflow-hidden">
     <!-- Chat messages -->
     <div class="flex-1 p-4 overflow-y-auto" ref="messagesContainer">
       <div v-for="message in messages" 
@@ -39,7 +39,7 @@
               <span style="color: #f1d700">(</span>
               <span style="color: #b670d6">
                 {
-                <template v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
+                <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
                   <span style="color: #9cdcfe">{{ key }}</span>
                   <span style="color: #9cdcfe">: </span>
                   <span style="color: #ce916a">{{ 
@@ -47,7 +47,7 @@
                       JSON.stringify(value) : 
                       JSON.stringify(value) 
                   }}</span>,
-                </template>
+                </span>
                 }
               </span>
               <span style="color: #f1d700">)</span>
@@ -62,8 +62,8 @@
     </div>
 
     <!-- Input area -->
-    <div class="p-4 border-t border-gray-700">
-      <div class="max-w-3xl mx-auto">
+    <div class="border-t border-gray-700">
+      <div class="max-w-3xl mx-auto p-4">
         <div class="flex items-center gap-4">
           <!-- Socket status indicator -->
           <div class="relative">
@@ -122,6 +122,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import ChatInput from './ChatInput.vue'
+import baseApi from '../utils/baseApi';
 
 const props = defineProps({
   chatid: {
@@ -193,6 +194,26 @@ const roomStatusMessage = computed(() => {
   }
 })
 
+async function loadChatMessages() {
+  try {
+    // Load messages for the selected chat
+    const dbMessages = await baseApi.get(`/chat/${props.chatid}/messages`)
+    
+    messages.value = dbMessages.data.map(msg => ({
+      ...msg,
+      id: msg.message_id,
+      timestamp: new Date(msg.created_timestamp)
+    }))
+  } catch (error) {
+    console.error('Error loading chat messages:', error)
+    emit('notification', {
+      type: 'error',
+        message: 'Failed to load chat messages',
+        id: Date.now()
+      })
+  }
+}
+
 // Socket setup and handlers
 async function setupSocketHandlers() {
   // Set up socket status handler
@@ -233,7 +254,7 @@ async function setupSocketHandlers() {
 
   // Message handler
   props.socketClient.onMessage((data) => {
-    if (data.room_id === props.roomid) {
+    if (data.room_id === roomid.value) {
       try {
         const eventData = JSON.parse(data.message)
         handleSocketMessage(eventData)
@@ -245,7 +266,7 @@ async function setupSocketHandlers() {
 }
 
 async function findRoom() {
-    // Find or create room for this chat
+  // Find or create room for this chat
   let roomid = null;
   try {
     const roomData = await props.socketClient.findChat(props.chatid)
@@ -319,6 +340,7 @@ async function rejoinChat() {
 }
 
 async function handleSocketMessage(eventData) {
+  console.log("[CHAT] [HANDLE SOCKET MESSAGE] Event data:", eventData)
   switch (eventData.type) {
     case 'conversation.item.input_audio_transcription.completed':
       handleTranscriptionComplete(eventData)
@@ -550,7 +572,7 @@ onMounted(async () => {
       return
     }
   }
-  
+  await loadChatMessages();
   const newRoomId = await findRoom();
   roomid.value = newRoomId;
   await setupSocketHandlers();

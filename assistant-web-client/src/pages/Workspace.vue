@@ -16,7 +16,7 @@
           <button @click="toggleSearch" class="p-2 hover:bg-gray-700 rounded">
             <Search class="h-5 w-5" />
           </button>
-          <button @click="createNewChat" class="p-2 hover:bg-gray-700 rounded">
+          <button @click="onNewChat" class="p-2 hover:bg-gray-700 rounded">
             <PenSquare class="h-5 w-5" />
           </button>
         </div>
@@ -83,78 +83,15 @@
     <div class="flex-1 flex flex-col">
       <!-- Model selector -->
       <div class="p-4 border-b border-gray-700">
-        <div class="relative max-w-xs ml-auto flex items-center gap-4">
-          <!-- Connection status indicator -->
-          <div class="relative">
-            <div 
-              class="w-3 h-3 rounded-full cursor-help"
-              :class="{
-                'bg-green-500': socketStatus === 'connected',
-                'bg-yellow-500': socketStatus === 'connecting' || socketStatus === 'reconnecting',
-                'bg-red-500': socketStatus === 'disconnected'
-              }"
-              @mouseenter="showStatusTooltip = true"
-              @mouseleave="showStatusTooltip = false"
-            ></div>
-            <!-- Tooltip -->
-            <div 
-              v-if="showStatusTooltip"
-              class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
-            >
-              {{ socketStatusMessage }}
-            </div>
-          </div>
-
-          <!-- Existing model selector button -->
-          <button 
-            @click="isModelSelectorOpen = !isModelSelectorOpen"
-            class="flex items-center justify-between w-full px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            <div class="flex items-center space-x-2">
-              <span class="text-sm">{{ selectedModel.name }}</span>
-            </div>
-            <ChevronDown class="h-4 w-4" :class="{ 'transform rotate-180': isModelSelectorOpen }" />
-          </button>
-
-          <!-- Dropdown menu -->
-          <div v-if="isModelSelectorOpen" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
-            <div class="p-2 space-y-1">
-              <div v-for="model in models" :key="model.id" class="p-2">
-                <button 
-                  @click="selectModel(model)"
-                  class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
-                >
-                  <div class="text-sm font-medium">{{ model.name }}</div>
-                  <div class="text-xs text-gray-400">{{ model.description }}</div>
-                </button>
-              </div>
-              
-              <!-- Toggles -->
-              <div class="border-t border-gray-700 mt-2 pt-2 space-y-2">
-                <div v-for="toggle in toggles" :key="toggle.id" 
-                  class="flex items-center justify-between p-2 hover:bg-gray-700 rounded-lg"
-                >
-                  <span class="text-sm">{{ toggle.name }}</span>
-                  <button 
-                    @click="toggle.enabled = !toggle.enabled"
-                    class="w-10 h-5 relative rounded-full transition-colors duration-200 ease-in-out"
-                    :class="[toggle.enabled ? 'bg-green-500' : 'bg-gray-600']"
-                  >
-                    <span 
-                      class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out"
-                      :class="[toggle.enabled ? 'transform translate-x-5' : '']"
-                    ></span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ModelSelector
+          v-model="selectedModel"
+        />
       </div>
 
       <!-- Chat area -->
       <template v-if="selectedChatId">
         <Chat 
+          :key="selectedChatId"
           :initial-message="initialMessage"
           :socket-client="socketClient"
           :chatid="selectedChatId"
@@ -163,7 +100,9 @@
         />
       </template>
       <template v-else>
-        <NewChat />
+        <NewChat 
+          @createChat="createNewChat"
+        />
       </template>
     </div>
   </div>
@@ -173,7 +112,7 @@
 // 1. Imports
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { 
-  Menu, Search, PenSquare, MessageSquare, ChevronDown,
+  Menu, Search, PenSquare, MessageSquare,
   Send, Image, PenLine, HelpCircle, FileText, Mic, Square, Trash2, TrashIcon
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
@@ -181,6 +120,7 @@ import { useUserStore } from '../store/userStore'
 import baseApi from '../utils/baseApi';
 import Chat from '../components/Chat.vue'
 import NewChat from '../components/NewChat.vue'
+import ModelSelector from '../components/ModelSelector.vue'
 
 //=====================================
 // State Variables
@@ -203,119 +143,10 @@ const hasMoreChats = ref(true)
 const chatsPerPage = 20
 const deleteHoverStates = ref({})
 
-const models = ref([
-  {
-    id: 1,
-    name: 'OpenAI Real Time GPT-4o',
-    description: 'Most capable model for complex tasks'
-  },
-  {
-    id: 2,
-    name: 'GPT-4 Turbo',
-    description: 'Faster version with latest knowledge'
-  },
-  {
-    id: 3,
-    name: 'GPT-3.5 Turbo',
-    description: 'Fast and efficient for most tasks'
-  },
-  {
-    id: 4,
-    name: 'Claude 2',
-    description: 'Advanced reasoning and analysis'
-  },
-  {
-    id: 5,
-    name: 'Claude Instant',
-    description: 'Quick responses for simple tasks'
-  }
-])
-
-const selectedModel = ref(models.value[0])
-
-const toggles = ref([
-  {
-    id: 1,
-    name: 'Temporary chat',
-    enabled: false
-  },
-  {
-    id: 2,
-    name: 'Web browsing',
-    enabled: false
-  },
-  {
-    id: 3,
-    name: 'Code interpreter',
-    enabled: false
-  }
-])
-
-const chatSections = ref([{ chats: [] }])
-
-const organizedChatSections = computed(() => {
-  const allChats = chatSections.value.flatMap(section => section.chats)
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const weekAgo = new Date(today)
-  weekAgo.setDate(weekAgo.getDate() - 7)
-
-  const sections = [
-    {
-      title: 'Today',
-      chats: allChats
-        .filter(chat => chat.timestamp >= today)
-        .sort((a, b) => b.timestamp - a.timestamp)
-    },
-    {
-      title: 'Yesterday',
-      chats: allChats
-        .filter(chat => chat.timestamp >= yesterday && chat.timestamp < today)
-        .sort((a, b) => b.timestamp - a.timestamp)
-    },
-    {
-      title: 'Previous 7 Days',
-      chats: allChats
-        .filter(chat => chat.timestamp >= weekAgo && chat.timestamp < yesterday)
-        .sort((a, b) => b.timestamp - a.timestamp)
-    },
-    {
-      title: 'Older',
-      chats: allChats
-        .filter(chat => chat.timestamp < weekAgo)
-        .sort((a, b) => b.timestamp - a.timestamp)
-    }
-  ]
-
-  return sections.filter(section => section.chats.length > 0)
-})
-
-const filteredChatSections = computed(() => {
-  if (!searchQuery.value) return organizedChatSections.value
-
-  return organizedChatSections.value.map(section => ({
-    ...section,
-    chats: section.chats.filter(chat => 
-      chat.title.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
-  })).filter(section => section.chats.length > 0)
-})
-
-const socketStatusMessage = computed(() => {
-  switch (socketStatus.value) {
-    case 'connected':
-      return 'Connected to server'
-    case 'connecting':
-      return 'Connecting to server...'
-    case 'reconnecting':
-      return 'Reconnecting to server...'
-    case 'disconnected':
-      return 'Disconnected from server'
-    default:
-      return 'Unknown connection status'
-  }
+const selectedModel = ref({
+  id: 0,
+  name: 'Loading...',
+  description: 'Please wait...'
 })
 
 async function initializeWebSocket() {
@@ -354,17 +185,6 @@ async function selectChat(chatid) {
   selectedChatId.value = chatid;
 }
 
-async function handleNewChat({ initialMessage, isVoiceChat }) {
-  const newChat = await createNewChat()
-  if (initialMessage) {
-    newMessage.value = initialMessage
-    await nextTick()
-    sendMessage()
-  } else if (isVoiceChat) {
-    startRecording()
-  }
-}
-
 function toggleSidebar() {
   isSidebarOpen.value = !isSidebarOpen.value
   if (!isSidebarOpen.value) {
@@ -380,68 +200,13 @@ function filterChats() {
   // Filtering is handled by computed property
 }
 
-async function createNewChat() {
-  if (socketStatus.value !== 'connected') {
-    const notification = {
-      type: 'error',
-      message: 'Cannot create new chat while disconnected from server',
-      id: Date.now()
-    }
-    notifications.value.push(notification)
-    setTimeout(() => {
-      notifications.value = notifications.value.filter(n => n.id !== notification.id)
-    }, 5000)
-    return
-  }
-
-  const newChatId = Date.now().toString()
-  const now = new Date()
-  
-  try {
-    // Create the chat in UI first
-    const newChat = {
-      id: newChatId,
-      title: 'New Chat',
-      timestamp: now,
-      messages: []
-    }
-
-    // Add to beginning of first section or create new section
-    if (!chatSections.value[0]) {
-      chatSections.value.unshift({ chats: [] })
-    }
-    chatSections.value[0].chats.unshift(newChat)
-    
-    // Select the new chat
-    selectChat(newChat.chatid)
-
-    // Create and join room in socket server
-    if (socketClient.value) {
-      console.log("Creating room for new chat:", newChatId.chatid)
-      const roomData = await socketClient.value.createRoom(newChat.chatid)
-      // Store the room ID with the chat
-      newChat.roomId = roomData.room_id
-      console.log("Room creation confirmed, roomId:", newChat.roomId)
-      await socketClient.value.joinRoom(newChat.roomId)
-      console.log("Room joined successfully")
-    }
-
-    return newChat
-  } catch (error) {
-    console.error("Failed to create chat room:", error)
-    // Remove the chat if room creation failed
-    if (chatSections.value[0]) {
-      chatSections.value[0].chats = chatSections.value[0].chats.filter(
-        chat => chat.chatid !== newChatId
-      )
-    }
-    throw error
-  }
+async function onNewChat() {
+  selectedChatId.value = null;
+  initialMessage.value = '';
 }
 
-function selectModel(model) {
-  selectedModel.value = model
-  isModelSelectorOpen.value = false
+async function createNewChat() {
+
 }
 
 onMounted(() => {
