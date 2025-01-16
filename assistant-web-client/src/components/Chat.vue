@@ -270,14 +270,14 @@ async function findRoom() {
   let roomid = null;
   try {
     const roomData = await props.socketClient.findChat(props.chatid)
-    if (roomData.room_id) {
+    if (roomData.roomid) {
       console.log("[WORKSPACE] [SELECT CHAT] Room found/created for chat:", roomData)
-      roomid = roomData.room_id
+      roomid = roomData.roomid
     } else {
       // Create room
       const roomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.full_name);
       console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
-      roomid = roomData.room_id
+      roomid = roomData.roomid
     }
     if (!roomid) {
       console.error("[WORKSPACE] [SELECT CHAT] Failed to find/create room for chat:", props.chatid)
