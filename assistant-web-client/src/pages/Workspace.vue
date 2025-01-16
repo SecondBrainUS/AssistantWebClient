@@ -160,6 +160,7 @@
           :chatid="selectedChat.chatid"
           :roomid="selectedChat.roomid"
           :selected-model="selectedModel"
+          @notification="handleNotification"
         />
       </template>
       <template v-else>
@@ -197,7 +198,6 @@ const isModelSelectorOpen = ref(false)
 const socketStatus = ref('disconnected')
 const showStatusTooltip = ref(false)
 const notifications = ref([])
-const chatIds = ref(new Map()); // Map to store room_id -> chat_id mappings
 const isLoadingChats = ref(false)
 const chatPage = ref(0)
 const hasMoreChats = ref(true)
@@ -353,38 +353,6 @@ async function selectChat(chatid) {
 
   // Set selected chatid
   selectedChatId.value = chatid;
-  await nextTick();
-
-  // Find or create room for this chat
-  let roomid = null;
-  try {
-    const roomData = await socketClient.value.findChat(chatid)
-    if (roomData.room_id) {
-      console.log("[WORKSPACE] [SELECT CHAT] Room found/created for chat:", roomData)
-      roomid = roomData.room_id
-    } else {
-      // Create room
-      const roomData = await socketClient.value.createRoom(chatid, selectedModel.value.name);
-      console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
-      roomid = roomData.room_id
-    }
-    if (!roomid) {
-      console.error("[WORKSPACE] [SELECT CHAT] Failed to find/create room for chat:", chatid)
-      notifications.value.push({
-        type: 'error',
-        message: 'Failed to connect to chat room',
-        id: Date.now()
-      })
-      return;
-    }
-  } catch (error) {
-    console.error("[WORKSPACE] [SELECT CHAT] Error finding/creating room for chat:", error)
-    notifications.value.push({
-      type: 'error',
-      message: 'Failed to connect to chat room',
-      id: Date.now()
-    })
-  }
 
   // Set selected chat
   selectedChat.value = {
@@ -392,7 +360,6 @@ async function selectChat(chatid) {
     chatid: chatid
   };
 }
-
 
 async function handleNewChat({ initialMessage, isVoiceChat }) {
   const newChat = await createNewChat()
@@ -600,6 +567,13 @@ async function confirmDeleteChat(chatId) {
   }
 }
 
+function handleNotification(notification) {
+  notifications.value.push(notification)
+  // Optionally auto-remove notification after a delay
+  setTimeout(() => {
+    notifications.value = notifications.value.filter(n => n.id !== notification.id)
+  }, 5000)
+}
 </script>
 
 <style>
@@ -626,4 +600,3 @@ html, body, #app {
   margin: 0;
 }
 </style>
-

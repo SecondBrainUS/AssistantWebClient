@@ -128,10 +128,6 @@ const props = defineProps({
     type: String,
     required: true
   },
-  roomid: {
-    type: String,
-    required: true
-  },
   socketClient: {
     type: Object,
     required: true
@@ -142,24 +138,26 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['startRecording', 'stopRecording'])
-
+const roomid = ref(null)
 const messages = ref([])
 const messageStatuses = ref(new Map())
+
 const pendingMessage = ref('')
+const currentAssistantMessage = ref(null)
 
 const messagesContainer = ref(null)
 const socketStatus = ref('disconnected')
 const roomStatus = ref('disconnected')
 const showSocketTooltip = ref(false)
 const showRoomTooltip = ref(false)
-const currentAssistantMessage = ref(null)
 const audioContext = ref(null)
 const audioQueue = ref([])
 const isPlaying = ref(false)
 const currentSource = ref(null)
 const nextPlayTime = ref(0)
 const isProcessing = ref(false)
+
+const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -246,11 +244,61 @@ async function setupSocketHandlers() {
   })
 }
 
+async function findRoom() {
+    // Find or create room for this chat
+  let roomid = null;
+  try {
+    const roomData = await props.socketClient.findChat(props.chatid)
+    if (roomData.room_id) {
+      console.log("[WORKSPACE] [SELECT CHAT] Room found/created for chat:", roomData)
+      roomid = roomData.room_id
+    } else {
+      // Create room
+      const roomData = await props.socketClient.createRoom(props.chatid, props.selectedModel.name);
+      console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
+      roomid = roomData.room_id
+    }
+    if (!roomid) {
+      console.error("[WORKSPACE] [SELECT CHAT] Failed to find/create room for chat:", props.chatid)
+      emit('notification', {
+        type: 'error',
+        message: 'Failed to connect to chat room',
+        id: Date.now()
+      })
+      return;
+    }
+  } catch (error) {
+    console.error("[WORKSPACE] [SELECT CHAT] Error finding/creating room for chat:", error)
+    emit('notification', {
+      type: 'error',
+      message: 'Failed to connect to chat room',
+      id: Date.now()
+    })
+  }
+
+  return roomid;
+}
+
 async function joinRoom() {
-	try {
-		await props.socketClient.joinRoom(props.roomid)
+  if (!roomid.value) {
+    console.error("[CHAT] [JOIN ROOM] Room ID not found")
+    emit('notification', {
+      type: 'error',
+      message: 'No room set',
+      id: Date.now()
+    })
+    return;
+  }
+
+  try {
+		await props.socketClient.joinRoom(roomid.value)
 	} catch (error) {
 		console.error('Error joining room:', error)
+		emit('notification', {
+			type: 'error',
+			message: 'Failed to join chat room',
+			id: Date.now()
+		})
 	}
 }
 
@@ -435,6 +483,11 @@ function playAudioBuffer(base64Audio) {
 async function handleSend(message) {
   if (socketStatus.value !== 'connected' || roomStatus.value !== 'connected') {
     console.error('Socket or room not connected')
+    emit('notification', {
+      type: 'error',
+      message: 'Cannot send message: Connection to server not available',
+      id: Date.now()
+    })
     return
   }
 
@@ -461,7 +514,7 @@ async function handleSend(message) {
     }
 
     await props.socketClient.sendConversationItem(
-      props.chatid, // TODO: change to room_id
+      roomid.value,
       item,
       props.selectedModel.name,
       props.chatid
@@ -469,7 +522,7 @@ async function handleSend(message) {
 
     messageStatuses.value.set(messageId, 'sent')
 
-    await props.socketClient.sendMessage(props.chatid, {
+    await props.socketClient.sendMessage(roomid.value, {
       type: 'response.create',
       data: {
         response: {
@@ -498,6 +551,8 @@ onMounted(async () => {
     }
   }
   
+  const newRoomId = await findRoom();
+  roomid.value = newRoomId;
   await setupSocketHandlers();
   await joinRoom();
   scrollToBottom();
@@ -548,4 +603,5 @@ function handleStartRecording() {
 function handleStopRecording() {
   emit('stopRecording')
 }
+
 </script>
