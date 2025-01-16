@@ -45,10 +45,10 @@
           <div class="space-y-1">
             <div
               v-for="chat in section.chats"
-              :key="chat.id"
-              @click="selectChat(chat.id)"
+              :key="chat.chatid"
+              @click="selectChat(chat.chatid)"
               class="px-2 py-1 hover:bg-gray-700 rounded cursor-pointer flex items-center justify-between group"
-              :class="{ 'bg-gray-700': selectedChatId === chat.id }"
+              :class="{ 'bg-gray-700': selectedChatId === chat.chatid }"
             >
               <div class="flex items-center">
                 <MessageSquare v-if="!isSidebarOpen" class="h-5 w-5" />
@@ -57,15 +57,15 @@
               <!-- Add delete button -->
               <button 
                 v-if="isSidebarOpen"
-                @click.stop="confirmDeleteChat(chat.id)"
+                @click.stop="confirmDeleteChat(chat.chatid)"
                 class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-600 rounded"
               >
                 <component 
-                  :is="deleteHoverStates[chat.id] ? Trash2 : TrashIcon"
+                  :is="deleteHoverStates[chat.chatid] ? Trash2 : TrashIcon"
                   class="h-4 w-4 transition-colors"
-                  :class="deleteHoverStates[chat.id] ? 'text-red-500' : 'text-gray-400'"
-                  @mouseenter="deleteHoverStates[chat.id] = true"
-                  @mouseleave="deleteHoverStates[chat.id] = false"
+                  :class="deleteHoverStates[chat.chatid] ? 'text-red-500' : 'text-gray-400'"
+                  @mouseenter="deleteHoverStates[chat.chatid] = true"
+                  @mouseleave="deleteHoverStates[chat.chatid] = false"
                 />
               </button>
             </div>
@@ -159,7 +159,7 @@
           :message-statuses="messageStatuses"
           :pending-message="newMessage"
           :socket-client="socketClient"
-          :chatid="selectedChat.id"
+          :chatid="selectedChat.chatid"
           :roomid="selectedChat.roomid"
           :selected-model="selectedModel"
           @send="sendMessage"
@@ -337,7 +337,7 @@ const filteredChatSections = computed(() => {
 const selectedChat = computed(() => {
   return chatSections.value
     .flatMap(section => section.chats)
-    .find(chat => chat.id === selectedChatId.value)
+    .find(chat => chat.chatid === selectedChatId.value)
 })
 
 const socketStatusMessage = computed(() => {
@@ -379,7 +379,7 @@ async function initializeWebSocket() {
     socketClient.value.onChatCreated((chatId) => {
       console.log("Chat created with ID:", chatId);
       if (selectedChat.value) {
-        chatIds.value.set(selectedChat.value.id, chatId);
+        chatIds.value.set(selectedChat.value.chatid, chatId);
       }
     });
 
@@ -397,7 +397,7 @@ async function selectChat(chatId) {
     const messages = await baseApi.get(`/chat/${chatId}/messages`)
     
     // Find and update the selected chat's messages
-    const chat = chatSections.value[0].chats.find(c => c.id === chatId)
+    const chat = chatSections.value[0].chats.find(c => c.chatid === chatId)
     if (chat) {
       chat.messages = messages.data.map(msg => ({
         ...msg,
@@ -597,7 +597,7 @@ async function createNewChat() {
     // Remove the chat if room creation failed
     if (chatSections.value[0]) {
       chatSections.value[0].chats = chatSections.value[0].chats.filter(
-        chat => chat.id !== newChatId
+        chat => chat.chatid !== newChatId
       )
     }
     throw error
@@ -652,7 +652,7 @@ async function loadChats(page = 0) {
 
     // Transform API chats into the expected format
     const formattedChats = chats.map(chat => ({
-      id: chat.chat_id,
+      chatid: chat.chat_id,
       title: `Chat ${chat.chat_id.slice(0, 8)}`, // Use first 8 chars of chat_id as title
       timestamp: new Date(chat.created_timestamp), // Updated to match API response
       messages: [] // Messages will be loaded separately when chat is selected
@@ -700,7 +700,7 @@ async function confirmDeleteChat(chatId) {
       // Remove chat from UI
       chatSections.value = chatSections.value.map(section => ({
         ...section,
-        chats: section.chats.filter(chat => chat.id !== chatId)
+        chats: section.chats.filter(chat => chat.chatid !== chatId)
       }))
       
       // If this was the selected chat, clear selection
