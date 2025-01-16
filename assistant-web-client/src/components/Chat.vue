@@ -13,58 +13,93 @@
            :key="message.id" 
            class="mb-4"
       >
-        <div class="flex justify-between items-center mb-1">
-          <div class="font-semibold">{{ message.role }}</div>
-          <div class="flex items-center space-x-2">
+        <!-- Function call and result grouping -->
+        <div v-if="message.type === 'function_call'" 
+             class="border border-gray-600 rounded-lg p-2 mb-4"
+        >
+          <div class="flex justify-between items-center mb-1">
+            <div class="font-semibold">{{ message.role }}</div>
             <div class="text-xs text-gray-400">
               {{ formatTimestamp(message.timestamp) }}
             </div>
-            <!-- Message status indicator -->
-            <div v-if="message.role === 'user'" class="text-xs">
-              <template v-if="messageStatuses.get(message.id) === 'sending'">
-                <span class="text-yellow-500">Sending...</span>
-              </template>
-              <template v-else-if="messageStatuses.get(message.id) === 'sent'">
-                <span class="text-green-500">✓</span>
-              </template>
-              <template v-else-if="messageStatuses.get(message.id) === 'error'">
-                <span class="text-red-500">Failed to send</span>
-              </template>
-            </div>
           </div>
-        </div>
-        <div :class="[
-          'p-3 rounded-lg',
-          message.role === 'user' ? 'bg-gray-600' : 
-          message.role === 'assistant' ? 'bg-gray-700' :
-          message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
-        ]">
-          <!-- Function call formatting -->
-          <template v-if="message.role === 'system' && message.type === 'function_call'">
+          <!-- Function call -->
+          <div class="p-3 rounded-lg bg-gray-800">
             <div class="font-mono">
               <span style="color: #dcdc90">{{ message.name }}</span>
               <span style="color: #f1d700">(</span>
               <span style="color: #b670d6">
-                {
-                <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                  <span style="color: #9cdcfe">{{ key }}</span>
-                  <span style="color: #9cdcfe">: </span>
-                  <span style="color: #ce916a">{{ 
-                    typeof value === 'object' ? 
-                      JSON.stringify(value) : 
-                      JSON.stringify(value) 
-                  }}</span>,
-                </span>
-                }
+                <template v-if="Object.keys(JSON.parse(message.arguments)).length > 0">
+                  {
+                  <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
+                    <span style="color: #9cdcfe">{{ key }}</span>
+                    <span style="color: #9cdcfe">: </span>
+                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
+                  </span>
+                  }
+                </template>
               </span>
               <span style="color: #f1d700">)</span>
             </div>
-          </template>
-          <!-- Regular message content -->
-          <template v-else>
-            {{ message.content }}
-          </template>
+          </div>
+          <!-- Function result -->
+          <div v-if="getFunctionResult(message.call_id)" 
+               class="mt-2 p-3 rounded-lg bg-gray-700"
+          >
+            <div class="flex justify-between items-center mb-1">
+              <div class="font-semibold">Result</div>
+              <div class="text-xs text-gray-400">
+                {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+              </div>
+            </div>
+            <div class="font-mono">
+              <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
+                <span style="color: #b670d6">{</span>
+                <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                  <span style="color: #9cdcfe">{{ key }}</span>
+                  <span style="color: #9cdcfe">: </span>
+                  <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                </span>
+                <span style="color: #b670d6">}</span>
+              </template>
+              <template v-else>
+                <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
+              </template>
+            </div>
+          </div>
         </div>
+
+        <!-- Regular messages (non-function calls) -->
+        <template v-else-if="message.type !== 'function_result'">
+          <div class="flex justify-between items-center mb-1">
+            <div class="font-semibold">{{ message.role }}</div>
+            <div class="flex items-center space-x-2">
+              <div class="text-xs text-gray-400">
+                {{ formatTimestamp(message.timestamp) }}
+              </div>
+              <!-- Message status indicator -->
+              <div v-if="message.role === 'user'" class="text-xs">
+                <template v-if="messageStatuses.get(message.id) === 'sending'">
+                  <span class="text-yellow-500">Sending...</span>
+                </template>
+                <template v-else-if="messageStatuses.get(message.id) === 'sent'">
+                  <span class="text-green-500">✓</span>
+                </template>
+                <template v-else-if="messageStatuses.get(message.id) === 'error'">
+                  <span class="text-red-500">Failed to send</span>
+                </template>
+              </div>
+            </div>
+          </div>
+          <div :class="[
+            'p-3 rounded-lg',
+            message.role === 'user' ? 'bg-gray-600' : 
+            message.role === 'assistant' ? 'bg-gray-700' :
+            message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
+          ]">
+            {{ message.content }}
+          </div>
+        </template>
       </div>
     </div>
 
@@ -215,6 +250,7 @@ async function loadChatMessages() {
       id: msg.message_id,
       timestamp: new Date(msg.created_timestamp)
     }))
+    console.log("Loaded chat messages:", JSON.stringify(messages.value, null, 2))
   } catch (error) {
     console.error('Error loading chat messages:', error)
     emit('notification', {
@@ -690,6 +726,30 @@ function handleStartRecording() {
 
 function handleStopRecording() {
   emit('stopRecording')
+}
+
+function getFunctionResult(callId) {
+  return messages.value.find(m => 
+    m.type === 'function_result' && 
+    m.call_id === callId
+  )
+}
+
+function formatResultValue(value) {
+  if (typeof value === 'string') {
+    return `"${value}"`
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(v => JSON.stringify(v)).join(', ')}]`
+  }
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value)
+  }
+  return value
+}
+
+function isLastKey(obj, key) {
+  return Object.keys(obj).pop() === key
 }
 
 </script>
