@@ -408,14 +408,32 @@ async function handleSocketMessage(eventData) {
     case 'response.audio_transcript.delta':
       handleAudioTranscriptDelta(eventData)
       break
+    case 'response.sb.function_result.done':
+      handleFunctionResultDone(eventData)
+      break
     case 'response.audio_transcript.done':
     case 'response.done':
-      handleResponseDone()
+      handleResponseDone(eventData)
       break
   }
 
   await nextTick()
   scrollToBottom()
+}
+
+function handleFunctionResultDone(eventData) {
+  console.log("[CHAT] [HANDLE FUNCTION RESULT DONE] Event data:", eventData)
+  
+  // Add function result message
+  messages.value.push({
+    id: eventData.response.message_id,
+    type: 'function_result',
+    role: 'system',
+    name: eventData.response.name,
+    call_id: eventData.response.call_id,
+    result: eventData.response.result,
+    timestamp: new Date(eventData.response.created_timestamp)
+  })
 }
 
 function handleTranscriptionComplete(eventData) {
@@ -464,8 +482,29 @@ function handleAudioTranscriptDelta(eventData) {
   }
 }
 
-function handleResponseDone() {
-  currentAssistantMessage.value = null
+function handleResponseDone(eventData) {
+  if (!eventData.response?.output?.[0]) {
+    currentAssistantMessage.value = null
+    return
+  }
+
+  const output = eventData.response.output[0]
+  
+  if (output.type === 'function_call') {
+    // Add function call message
+    messages.value.push({
+      id: output.id,
+      type: 'function_call',
+      role: 'assistant',
+      name: output.name,
+      call_id: output.call_id,
+      arguments: output.arguments,
+      timestamp: new Date(eventData.timestamp)
+    })
+  } else if (output.type === 'message' && output.status === 'completed') {
+    // Clear current assistant message when message is complete
+    currentAssistantMessage.value = null
+  }
 }
 
 // Audio handling functions
