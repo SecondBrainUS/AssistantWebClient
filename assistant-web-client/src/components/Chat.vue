@@ -307,7 +307,7 @@ async function setupSocketHandlers() {
   // Message handler
   props.socketClient.onRoomMessage(roomid.value, (data) => {
     console.log("[CHAT] [ON ROOM MESSAGE] Data:", data)
-    if (data.room_id != roomid.value) return;
+    // if (data.room_id != roomid.value) return;
     try {
       handleSocketMessage(data)
     } catch (error) {
@@ -430,7 +430,9 @@ function handleTranscriptionComplete(eventData) {
 }
 
 function handleTextDelta(eventData) {
+  console.log("[CHAT] [HANDLE TEXT DELTA] Event data:", eventData)
   if (!currentAssistantMessage.value) {
+    console.log("[CHAT] [HANDLE TEXT DELTA] Creating new assistant message")
     currentAssistantMessage.value = {
       id: Date.now().toString(),
       role: 'assistant',
@@ -439,6 +441,7 @@ function handleTextDelta(eventData) {
     }
     messages.value.push(currentAssistantMessage.value)
   } else {
+    console.log("[CHAT] [HANDLE TEXT DELTA] Appending to existing assistant message")
     currentAssistantMessage.value.content += eventData.delta
   }
 }
@@ -714,7 +717,7 @@ onUnmounted(() => {
   // Cleanup socket handlers
   if (props.socketClient) {
     props.socketClient.onStatusChange(null)
-    props.socketClient.onRoomMessage(null)
+    props.socketClient.onRoomMessage(null,null)
     props.socketClient.onRoomCreated(null)
     props.socketClient.onRoomJoined(roomid.value, null)
     props.socketClient.onRoomError(null)
