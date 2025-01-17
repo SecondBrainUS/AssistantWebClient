@@ -126,18 +126,43 @@ class SocketClient {
       throw new Error("Socket is not connected. Call connect() first.")
     }
     console.log("Sending message:", { room_id: roomid, message: message, model_id: modelid })
-    this.socket.emit("send_message", { room_id: roomid, message: message, model_id: modelid })
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Message send timed out"));
+      }, 30000); // 30 second timeout
+
+      const messageid = new Date().getTime().toString()
+      message.id = messageid
+      // Set up one-time listener for message confirmation
+      this.socket.once(`message_sent ${messageid}`, (data) => {
+        clearTimeout(timeoutId);
+        console.log("[SOCKET] [SEND MESSAGE] Message sent:", data);
+        resolve(data);
+      });
+
+      // Set up one-time listener for message error
+      this.socket.once(`message_error ${messageid}`, (error) => {
+        clearTimeout(timeoutId);
+        console.error("[SOCKET] [SEND MESSAGE] Message send failed:", error);
+        reject(error);
+      });
+
+      // Emit the message
+      this.socket.emit("send_message", { 
+        room_id: roomid, 
+        message: message, 
+        model_id: modelid 
+      });
+    });
   }
 
-  onMessage(callback) {
-    if (this.messageCallback) {
-      this.socket.off("receive_message");
-      this.messageHandlerSet = false;
+  onRoomMessage(roomid, callback) {
+    console.log("Setting up room message listener for room:", roomid)
+    if (!this.socket || !this.isConnected) {
+      throw new Error("Socket is not connected. Call connect() first.")
     }
-    this.messageCallback = callback;
-    if (this.socket && this.isConnected) {
-      this.setupMessageHandler();
-    }
+    this.socket.off(`receive_message ${roomid}`);
+    this.socket.on(`receive_message ${roomid}`, callback);
   }
 
   onRoomCreated(callback) {
@@ -222,36 +247,6 @@ class SocketClient {
     });
   }
 
-  async sendConversationItem(roomId, item, modelid, chatId = null) {
-    if (!this.isConnected) {
-      throw new Error("Socket is not connected. Call connect() first.");
-    }
-
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        this.pendingItems.delete(item.id);
-        reject(new Error("Conversation item creation timed out"));
-      }, 20000); // 20 second timeout
-
-      this.pendingItems.set(item.id, {
-        resolve,
-        reject,
-        timeoutId
-      });
-
-      // Send the create request
-      this.socket.emit("send_message", {
-        room_id: roomId,
-        message: {
-          type: "conversation.item.create",
-          data: { item },
-          chat_id: chatId
-        },
-        model_id: modelid
-      });
-    });
-  }
-
   onChatCreated(callback) {
     this.chatCreatedCallback = callback;
   }
@@ -277,27 +272,6 @@ class SocketClient {
           }
           return;
         }
-
-        // Handle conversation.item.created events
-        if (data.message) {
-          try {
-            const eventData = JSON.parse(data.message);
-            if (eventData.type === "conversation.item.created") {
-              const itemId = eventData.item.id;
-              const pendingItem = this.pendingItems.get(itemId);
-              
-              if (pendingItem) {
-                clearTimeout(pendingItem.timeoutId);
-                this.pendingItems.delete(itemId);
-                pendingItem.resolve(eventData.item);
-              }
-              return;
-            }
-          } catch (error) {
-            console.error("Error processing item created event:", error);
-          }
-        }
-
         // Handle all other messages
         if (this.messageCallback) {
           this.messageCallback(data);

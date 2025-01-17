@@ -70,7 +70,14 @@
         <!-- Regular messages (non-function calls) -->
         <template v-else-if="message.type !== 'function_result'">
           <div class="flex justify-between items-center mb-1">
-            <div class="font-semibold">{{ message.role }}</div>
+            <div class="flex items-center gap-2">
+              <div class="font-semibold">{{ message.role }}</div>
+              <!-- Add source indicator for user messages -->
+              <div v-if="message.role === 'user' && message.source" 
+                   class="text-xs text-gray-400 italic">
+                (other session)
+              </div>
+            </div>
             <div class="flex items-center space-x-2">
               <div class="text-xs text-gray-400">
                 {{ formatTimestamp(message.timestamp) }}
@@ -298,14 +305,13 @@ async function setupSocketHandlers() {
   })
 
   // Message handler
-  props.socketClient.onMessage((data) => {
-    if (data.room_id === roomid.value) {
-      try {
-        const eventData = JSON.parse(data.message)
-        handleSocketMessage(eventData)
-      } catch (error) {
-        console.error('Error processing message:', error)
-      }
+  props.socketClient.onRoomMessage(roomid.value, (data) => {
+    console.log("[CHAT] [ON ROOM MESSAGE] Data:", data)
+    if (data.room_id != roomid.value) return;
+    try {
+      handleSocketMessage(data)
+    } catch (error) {
+      console.error('Error processing message:', error)
     }
   })
 }
@@ -387,6 +393,9 @@ async function rejoinChat() {
 async function handleSocketMessage(eventData) {
   console.log("[CHAT] [HANDLE SOCKET MESSAGE] Event data:", eventData)
   switch (eventData.type) {
+    case 'user.message':
+      handleUserMessage(eventData)
+      break
     case 'conversation.item.input_audio_transcription.completed':
       handleTranscriptionComplete(eventData)
       break
@@ -546,6 +555,27 @@ function playAudioBuffer(base64Audio) {
   }
 }
 
+function handleUserMessage(eventData) {
+  console.log("[CHAT] [HANDLE USER MESSAGE] Event data:", eventData)
+  
+  // Extract the message content
+  const messageContent = eventData.message.data.item.content[0].text
+  const messageId = eventData.message.data.item.id
+
+  // If this message isn't in our messageStatuses, it came from another session
+  const source = !messageStatuses.value.has(messageId) ? 'other-session' : null
+
+  const message = {
+    id: messageId,
+    role: 'user',
+    content: messageContent,
+    timestamp: new Date(),
+    source
+  }
+
+  messages.value.push(message)
+}
+
 // Message handling
 async function handleSend(message) {
   if (socketStatus.value !== 'connected' || roomStatus.value !== 'connected') {
@@ -558,12 +588,12 @@ async function handleSend(message) {
     return
   }
 
-  const messageId = Date.now().toString()
+  const localMessageId = Date.now().toString()
   try {
-    messageStatuses.value.set(messageId, 'sending')
+    messageStatuses.value.set(localMessageId, 'sending')
     
     const newMessage = {
-      id: messageId,
+      id: localMessageId,
       role: 'user',
       content: message,
       timestamp: new Date()
@@ -571,7 +601,7 @@ async function handleSend(message) {
     messages.value.push(newMessage)
 
     const item = {
-      id: messageId,
+      id: localMessageId,
       type: 'message',
       role: 'user',
       content: [{
@@ -580,14 +610,14 @@ async function handleSend(message) {
       }]
     }
 
-    await props.socketClient.sendConversationItem(
-      roomid.value,
-      item,
-      selectedModel.value.model_id,
-      props.chatid
-    )
+    const messageData = {
+        type: "conversation.item.create",
+        data: { item }
+      }
 
-    messageStatuses.value.set(messageId, 'sent')
+    await props.socketClient.sendMessage(roomid.value, messageData, selectedModel.value.model_id)
+
+    messageStatuses.value.set(localMessageId, 'sent')
 
     await props.socketClient.sendMessage(roomid.value, {
       type: 'response.create',
@@ -601,7 +631,7 @@ async function handleSend(message) {
     })
   } catch (error) {
     console.error('Error sending message:', error)
-    messageStatuses.value.set(messageId, 'error')
+    messageStatuses.value.set(localMessageId, 'error')
   }
 }
 
@@ -684,7 +714,7 @@ onUnmounted(() => {
   // Cleanup socket handlers
   if (props.socketClient) {
     props.socketClient.onStatusChange(null)
-    props.socketClient.onMessage(null)
+    props.socketClient.onRoomMessage(null)
     props.socketClient.onRoomCreated(null)
     props.socketClient.onRoomJoined(roomid.value, null)
     props.socketClient.onRoomError(null)
