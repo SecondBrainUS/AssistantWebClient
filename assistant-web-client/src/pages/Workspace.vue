@@ -104,6 +104,7 @@
           :socket-client="socketClient"
           :chatid="selectedChatId"
           :initial-message="pendingInitialMessage"
+          :start-recording="startRecording"
           @notification="handleNotification"
         />
       </template>
@@ -196,7 +197,8 @@ const filteredChatSections = computed(() => {
   })).filter(section => section.chats.length > 0)
 })
 
-const pendingInitialMessage = ref(null)
+const pendingInitialMessage = ref(null);
+const startRecording = ref(false);
 
 async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
@@ -253,9 +255,9 @@ async function onNewChat() {
   selectedChatId.value = null;
 }
 
-async function createNewChat({ chatid, modelid, initialMessage, startRecording }) {
+async function createNewChat({ chatid, modelid, initialMessage, boolStartRecording }) {
   if (!chatid) return;
-  console.log("Creating new chat:", chatid, modelid, initialMessage, startRecording)
+  console.log("Creating new chat:", chatid, modelid, initialMessage, boolStartRecording)
 
   try {
     // Add the new chat to the UI immediately
@@ -274,6 +276,7 @@ async function createNewChat({ chatid, modelid, initialMessage, startRecording }
 
     // Set pending initial message if provided
     pendingInitialMessage.value = initialMessage
+    startRecording.value = boolStartRecording
     await nextTick();
 
     // Set as selected chat

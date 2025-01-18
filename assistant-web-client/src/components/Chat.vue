@@ -184,6 +184,10 @@ const props = defineProps({
   initialMessage: {
     type: String,
     default: null
+  },
+  startRecording: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -193,7 +197,7 @@ const messageStatuses = ref(new Map())
 
 const pendingMessage = ref('')
 const currentAssistantMessage = ref(null)
-
+const isRecording = ref(false)
 const modelSelector = ref(null)
 const selectedModel = ref(null)
 
@@ -618,7 +622,6 @@ function handleUserMessage(eventData) {
   messages.value.push(message)
 }
 
-// Message handling
 async function handleSend(message) {
   if (socketStatus.value !== 'connected' || roomStatus.value !== 'connected') {
     console.error('Socket or room not connected')
@@ -790,8 +793,24 @@ function formatTimestamp(timestamp) {
 }
 
 // Recording handlers
-function handleStartRecording() {
-  emit('startRecording')
+async function handleStartRecording() {
+  try {
+    await props.socketClient.sendMessage(roomid.value, { type: 'input_audio_buffer.clear' });
+
+    // start recording + callback
+  } catch (error) {
+    console.error('[CHAT] Error clearing audio buffer:', error);
+  }
+}
+
+async function onRecordingAudio() {
+  await socketClient.value.sendMessage(roomid.value, {
+    type: 'input_audio_buffer.append',
+    data: {
+      audio: base64Audio,
+      event_id: `event_${Date.now()}`
+    }
+  });
 }
 
 function handleStopRecording() {
@@ -822,4 +841,12 @@ function isLastKey(obj, key) {
   return Object.keys(obj).pop() === key
 }
 
+/*
+startRecording
+  check if already recording
+  send clear input buffer event
+
+
+
+*/
 </script>

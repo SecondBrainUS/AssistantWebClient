@@ -75,9 +75,9 @@ function processAudioQueue() {
   
 	  playNextChunk();
 	}
-  }
+}
   
-  function playAudioBuffer(base64Audio) {
+function playAudioBuffer(base64Audio) {
 	try {
 	  if (!audioContext.value) {
 		audioContext.value = new (window.AudioContext || window.webkitAudioContext)();
@@ -90,96 +90,98 @@ function processAudioQueue() {
 	} catch (error) {
 	  console.error('Error queueing audio:', error);
 	}
-  }
+}
   
-  // Add these methods for microphone handling
-  async function startRecording() {
+// Add these methods for microphone handling
+/*
+Do this before starting recording:
+
+// Clear any existing audio buffer before starting
+await socketClient.value?.sendMessage(selectedChat.value.id, {
+	type: 'input_audio_buffer.clear'
+});
+
+*/
+async function startRecording() {
 	try {
-	  // Create new chat if none selected
-	  if (!selectedChat.value) {
-		await createNewChat()
-	  }
-  
-	  if (isProcessing.value) {
-		console.log('Already processing a request, please wait...');
-		return;
-	  }
-  
-	  // Check if microphone access is already granted
-	  const devices = await navigator.mediaDevices.enumerateDevices();
-	  const hasMicAccess = devices.some(device => device.kind === 'audioinput' && device.label);
-  
-	  if (!hasMicAccess) {
-		// Request microphone access
-		await navigator.mediaDevices.getUserMedia({ audio: true });
-	  }
-  
-	  // Clear any existing audio buffer before starting
-	  await socketClient.value?.sendMessage(selectedChat.value.id, {
-		type: 'input_audio_buffer.clear'
-	  });
-  
-	  if (!audioContext.value) {
-		audioContext.value = new (window.AudioContext || window.webkitAudioContext)({
-		  sampleRate: 24000  // Match OpenAI's expected sample rate
-		});
-	  }
-  
-	  // Get microphone access with specific constraints
-	  micStream.value = await navigator.mediaDevices.getUserMedia({
-		audio: {
-		  channelCount: 1,          // Mono audio
-		  sampleRate: 24000,        // Match OpenAI's sample rate
-		  echoCancellation: true,
-		  noiseSuppression: true
+
+		if (isProcessing.value) {
+			console.log('Already processing a request, please wait...');
+			return;
 		}
-	  });
-  
-	  // Create audio processing pipeline
-	  const source = audioContext.value.createMediaStreamSource(micStream.value);
-	  audioProcessor.value = audioContext.value.createScriptProcessor(4096, 1, 1);
-	  
-	  audioProcessor.value.onaudioprocess = async (e) => {
+
+		// Check if microphone access is already granted
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const hasMicAccess = devices.some(device => device.kind === 'audioinput' && device.label);
+
+		if (!hasMicAccess) {
+			// Request microphone access
+			await navigator.mediaDevices.getUserMedia({ audio: true });
+		}
+
+
+
+		if (!audioContext.value) {
+			audioContext.value = new (window.AudioContext || window.webkitAudioContext)({
+				sampleRate: 24000
+			});
+		}
+
+		// Get microphone access with specific constraints
+		micStream.value = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				channelCount: 1,          // Mono audio
+				sampleRate: 24000,        // Match OpenAI's sample rate
+				echoCancellation: true,
+				noiseSuppression: true
+			}
+		});
+
+		// Create audio processing pipeline
+		const source = audioContext.value.createMediaStreamSource(micStream.value);
+		audioProcessor.value = audioContext.value.createScriptProcessor(4096, 1, 1);
+		
+		audioProcessor.value.onaudioprocess = async (e) => {
 		try {
-		  const inputData = e.inputBuffer.getChannelData(0);
-		  
-		  // Skip silent audio
-		  const isAudible = inputData.some(sample => Math.abs(sample) > 0.01);
-		  if (!isAudible) {
+			const inputData = e.inputBuffer.getChannelData(0);
+			
+			// Skip silent audio
+			const isAudible = inputData.some(sample => Math.abs(sample) > 0.01);
+			if (!isAudible) {
 			console.log('Skipping silent audio chunk');
 			return;
-		  }
-  
-		  // Convert Float32Array to base64 PCM16 using proper encoding
-		  const base64Audio = floatTo16BitPCMBase64(inputData);
-		  
-		  // Send properly structured message
-		  if (socketClient.value && selectedChat.value?.id) {
+			}
+
+			// Convert Float32Array to base64 PCM16 using proper encoding
+			const base64Audio = floatTo16BitPCMBase64(inputData);
+			
+			// Send properly structured message
+			if (socketClient.value && selectedChat.value?.id) {
 			const message = {
-			  type: 'input_audio_buffer.append',
-			  data: {
+				type: 'input_audio_buffer.append',
+				data: {
 				audio: base64Audio,
 				event_id: `event_${Date.now()}`
-			  }
+				}
 			};
 			
 			await socketClient.value.sendMessage(selectedChat.value.id, message);
-		  }
+			}
 		} catch (error) {
-		  console.error('Error processing audio chunk:', error);
+			console.error('Error processing audio chunk:', error);
 		}
-	  };
-  
-	  // Connect the audio nodes
-	  source.connect(audioProcessor.value);
-	  audioProcessor.value.connect(audioContext.value.destination);
-	  
-	  isRecording.value = true;
-  
+		};
+
+		// Connect the audio nodes
+		source.connect(audioProcessor.value);
+		audioProcessor.value.connect(audioContext.value.destination);
+		
+		isRecording.value = true;
+
 	} catch (error) {
-	  console.error('Error starting recording:', error);
+		console.error('Error starting recording:', error);
 	}
-  }
+}
   
   // Helper function to convert Float32Array to base64 PCM16
   function floatTo16BitPCMBase64(float32Array) {
