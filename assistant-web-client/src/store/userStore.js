@@ -41,6 +41,8 @@ export const useUserStore = defineStore('user', {
     async logout() {
       try {
         await baseApi.post('/auth/logout')
+      } catch (error) {
+        console.error('Logout failed:', error)
       } finally {
         this.isAuthenticated = false
         this.user = null
