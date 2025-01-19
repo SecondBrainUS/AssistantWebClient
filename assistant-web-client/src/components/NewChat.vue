@@ -44,7 +44,7 @@ async function handleNewChat(message) {
 
 async function handleStartRecording() {
   const chatid = await createNewChat();
-  emit('createChat', { chatid: chatid, modelid: selectedModel.value.model_id, startRecording: true })
+  emit('createChat', { chatid: chatid, modelid: selectedModel.value.model_id, boolStartRecording: true })
 }
 
 async function createNewChat() {

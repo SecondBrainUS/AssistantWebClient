@@ -16,7 +16,7 @@ function floatTo16BitPCMBase64(float32Array) {
 		view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
 	}
 
-	// Then convert to base64 in chunks
+	// Convert to base64 in chunks
 	let binary = '';
 	const bytes = new Uint8Array(buffer);
 	const chunkSize = 0x8000; // 32KB chunks
@@ -33,72 +33,105 @@ function floatTo16BitPCMBase64(float32Array) {
 // Recording Functions
 //=============================================
 async function startRecording(
+	callback,
 	sampleRate = 24000, 
 	channelCount = 1, 
 	echoCancellation = true, 
-	noiseSuppression = true
-){
+	noiseSuppression = true,
+) {
 	try {
+		// Check if already recording
+		if (isRecording) return { 'success': false, 'message': 'Recording already in progress.'}
+		isRecording = true;
 
+		// Check if microphone access is already granted
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const hasMicAccess = devices.some(device => device.kind === 'audioinput' && device.label);
 
-	// Check if already recording
-	if (isRecording) return { 'success': false, 'message': 'Recording already in progress.'}
-	isRecording = true;
-
-	// Check if microphone access is already granted
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const hasMicAccess = devices.some(device => device.kind === 'audioinput' && device.label);
-
-	// Request microphone access
-	if (!hasMicAccess) {
-		await navigator.mediaDevices.getUserMedia({ audio: true });
-	}
-
-	audioContext = new(window.AudioContext || window.webkitAudioContext)({
-        sampleRate: sampleRate
-    });
-
-	// Load and register the audio worklet
-	await audioContext.audioWorklet.addModule('/src/utils/audioProcessor.worklet.js');
-
-	// Get microphone access
-	micStream = await navigator.mediaDevices.getUserMedia({
-		audio: {
-			channelCount: channelCount,
-			sampleRate: sampleRate,
-			echoCancellation: echoCancellation,
-			noiseSuppression: noiseSuppression
+		// Request microphone access
+		if (!hasMicAccess) {
+			await navigator.mediaDevices.getUserMedia({ audio: true });
 		}
-	});
-	
-	// Create audio processing pipeline
-	const source = audioContext.createMediaStreamSource(micStream);
-	audioProcessor = new AudioWorkletNode(audioContext, 'audio-processor');
-	
-	// Handle audio data from the worklet
-	audioProcessor.port.onmessage = (event) => {
-		const audioData = event.data.audioData; // Assumes mono
 
-		// Skip silent audio
-        const isAudible = audioData.some(sample => Math.abs(sample) > 0.01);
-        if (!isAudible) {
-          console.log('Skipping silent audio chunk');
-          return;
-        }
+		audioContext = new(window.AudioContext || window.webkitAudioContext)({
+			sampleRate: sampleRate
+		});
 
-		// Convert Float32Array to base64 PCM16 using proper encoding
-		const base64Audio = floatTo16BitPCMBase64(inputData);
-			
-	};
+		// Load and register the audio worklet
+		await audioContext.audioWorklet.addModule('/src/utils/audioProcessor.worklet.js');
 
-	// Connect the nodes
-	source.connect(audioProcessor);
-	audioProcessor.connect(audioContext.destination);
+		// Get microphone access
+		micStream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				channelCount: channelCount,
+				sampleRate: sampleRate,
+				echoCancellation: echoCancellation,
+				noiseSuppression: noiseSuppression
+			}
+		});
+		
+		// Create audio processing pipeline
+		const source = audioContext.createMediaStreamSource(micStream);
+		audioProcessor = new AudioWorkletNode(audioContext, 'audio-processor');
+		
+		// Handle audio data from the worklet
+		audioProcessor.port.onmessage = async (event) => {
+			const audioData = event.data.audioData; // Assumes mono
 
-	return { 'success': true, 'message': 'Recording started successfully.' };
+			// Skip silent audio
+			const isAudible = audioData.some(sample => Math.abs(sample) > 0.01);
+			if (!isAudible) {
+				console.log('Skipping silent audio chunk');
+				return;
+			}
+
+			// Convert Float32Array to base64 PCM16 using proper encoding
+			const base64Audio = floatTo16BitPCMBase64(audioData);
+			console.log('AUDIO CHUNK');
+			console.log(base64Audio);
+			await callback(base64Audio);
+		};
+
+		// Connect the nodes
+		source.connect(audioProcessor);
+		audioProcessor.connect(audioContext.destination);
+
+		return { 'success': true, 'message': 'Recording started successfully.' };
 
 	} catch (e) {
 		isRecording = false;
 		throw e;
 	}
 }
+
+function stopRecording() {
+	if (!isRecording) return { 'success': false, 'message': 'No recording in progress.' };
+
+	try {
+		// Disconnect and cleanup audio pipeline
+		if (audioProcessor) {
+			audioProcessor.disconnect();
+			audioProcessor = null;
+		}
+
+		// Stop all microphone tracks
+		if (micStream) {
+			micStream.getTracks().forEach(track => track.stop());
+			micStream = null;
+		}
+
+		// Close audio context
+		if (audioContext) {
+			audioContext.close();
+			audioContext = null;
+		}
+
+		isRecording = false;
+		return { 'success': true, 'message': 'Recording stopped successfully.' };
+	} catch (e) {
+		console.error('Error stopping recording:', e);
+		return { 'success': false, 'message': 'Error stopping recording: ' + e.message };
+	}
+}
+
+export default { startRecording, stopRecording };

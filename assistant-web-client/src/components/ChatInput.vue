@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { Send, Mic, Square } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -46,16 +46,26 @@ const props = defineProps({
   initialText: {
     type: String,
     default: ''
+  },
+  startRecordingOnMount: {
+    type: Boolean,
+    default: false
   }
 })
 
 const emit = defineEmits(['send', 'startRecording', 'stopRecording'])
-
-const messageText = ref(props.initialText)
 const isRecording = ref(false)
+const messageText = ref(props.initialText)
 
+// TODO: should remove, no prop mutations
 watch(() => props.initialText, (newVal) => {
   messageText.value = newVal
+})
+
+onMounted(() => {
+  if (props.startRecordingOnMount) {
+    startRecording()
+  }
 })
 
 function handleSend() {

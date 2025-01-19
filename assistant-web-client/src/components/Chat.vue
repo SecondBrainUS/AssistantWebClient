@@ -77,6 +77,14 @@
                    class="text-xs text-gray-400 italic">
                 (other session)
               </div>
+              <!-- Add audio indicator -->
+              <div v-if="message.isAudio" 
+                   class="text-xs text-gray-400 flex items-center gap-1">
+                <Mic class="h-4 w-4" />
+                <span v-if="message.awaitingTranscription" class="italic">
+                  Transcribing...
+                </span>
+              </div>
             </div>
             <div class="flex items-center space-x-2">
               <div class="text-xs text-gray-400">
@@ -102,7 +110,12 @@
             message.role === 'assistant' ? 'bg-gray-700' :
             message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
           ]">
-            {{ message.content }}
+            <div v-if="message.awaitingTranscription" class="text-gray-400 italic">
+              Audio message - awaiting transcription...
+            </div>
+            <div v-else>
+              {{ message.content }}
+            </div>
           </div>
         </template>
       </div>
@@ -156,6 +169,7 @@
 
           <ChatInput 
             :initial-text="pendingMessage"
+            :start-recording-on-mount="startRecording"
             @send="handleSend"
             @startRecording="handleStartRecording"
             @stopRecording="handleStopRecording"
@@ -168,9 +182,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
+import { Mic } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
+import audioHandler from '../utils/audioHandler';
 
 const props = defineProps({
   chatid: {
@@ -441,14 +457,28 @@ function handleFunctionResultDone(eventData) {
 }
 
 function handleTranscriptionComplete(eventData) {
-  const transcriptMessage = {
-    id: eventData.item_id,
-    role: 'user',
-    content: eventData.transcript,
-    timestamp: new Date()
+  // Find and update the temporary audio message
+  const audioMessage = messages.value.find(m => 
+    m.isAudio && m.awaitingTranscription
+  );
+  
+  if (audioMessage) {
+    audioMessage.content = eventData.transcript;
+    audioMessage.awaitingTranscription = false;
+    messageStatuses.value.set(eventData.item_id, 'sent');
+  } else {
+    // Fallback to creating new message if temporary one not found
+    const transcriptMessage = {
+      id: eventData.item_id,
+      role: 'user',
+      content: eventData.transcript,
+      timestamp: new Date(),
+      isAudio: true,
+      awaitingTranscription: false
+    };
+    messages.value.push(transcriptMessage);
+    messageStatuses.value.set(eventData.item_id, 'sent');
   }
-  messages.value.push(transcriptMessage)
-  messageStatuses.value.set(eventData.item_id, 'sent')
 }
 
 function handleTextDelta(eventData) {
@@ -751,6 +781,10 @@ onMounted(async () => {
     console.log("Sending initial message:", props.initialMessage)
     await handleSend(props.initialMessage);
   }
+
+  if (props.startRecording) {
+    await handleStartRecording();
+  }
   
   scrollToBottom();
 })
@@ -796,15 +830,15 @@ function formatTimestamp(timestamp) {
 async function handleStartRecording() {
   try {
     await props.socketClient.sendMessage(roomid.value, { type: 'input_audio_buffer.clear' });
-
+    await audioHandler.startRecording(onRecordingAudio);
     // start recording + callback
   } catch (error) {
     console.error('[CHAT] Error clearing audio buffer:', error);
   }
 }
 
-async function onRecordingAudio() {
-  await socketClient.value.sendMessage(roomid.value, {
+async function onRecordingAudio(base64Audio) {
+  await props.socketClient.sendMessage(roomid.value, {
     type: 'input_audio_buffer.append',
     data: {
       audio: base64Audio,
@@ -813,8 +847,40 @@ async function onRecordingAudio() {
   });
 }
 
-function handleStopRecording() {
-  emit('stopRecording')
+async function handleStopRecording() {
+  try {
+    audioHandler.stopRecording();
+    
+    // Add temporary audio message
+    const audioMessageId = Date.now().toString();
+    messages.value.push({
+      id: audioMessageId,
+      role: 'user',
+      content: '',
+      timestamp: new Date(),
+      isAudio: true,
+      awaitingTranscription: true
+    });
+    
+    await props.socketClient.sendMessage(roomid.value, {
+      type: 'input_audio_buffer.commit',
+      event_id: `event_${Date.now()}`
+    });
+
+    await props.socketClient.sendMessage(roomid.value, {
+      type: 'response.create',
+      event_id: `event_${Date.now()}`,
+      data: {
+        response: {
+          modalities: ['text', 'audio'],
+          temperature: 0.7,
+          max_output_tokens: 1500
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error stopping recording:', error);
+  }
 }
 
 function getFunctionResult(callId) {
@@ -840,13 +906,4 @@ function formatResultValue(value) {
 function isLastKey(obj, key) {
   return Object.keys(obj).pop() === key
 }
-
-/*
-startRecording
-  check if already recording
-  send clear input buffer event
-
-
-
-*/
 </script>
