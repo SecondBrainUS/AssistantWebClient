@@ -4,7 +4,6 @@ import baseApi from '../utils/baseApi'
 export const useUserStore = defineStore('user', {
   state: () => ({
     user: null,
-    userid: null,
     isAuthenticated: false,
     profilePicture: null,
     loading: false,
@@ -31,7 +30,6 @@ export const useUserStore = defineStore('user', {
       try {
         const { data } = await baseApi.get('/auth/me')
         this.user = data
-        this.userid = data.user_id
         this.isAuthenticated = true
         this.profilePicture = data.picture
       } catch (error) {
@@ -46,7 +44,6 @@ export const useUserStore = defineStore('user', {
       } finally {
         this.isAuthenticated = false
         this.user = null
-        this.userid = null
         this.profilePicture = null
       }
     }
