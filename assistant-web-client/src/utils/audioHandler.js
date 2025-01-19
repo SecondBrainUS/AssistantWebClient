@@ -8,6 +8,7 @@ let audioQueue = [];
 let isPlaying = false;
 let nextPlayTime = 0;
 let currentSource = null;
+let onPlaybackComplete = null;
 
 //=============================================
 // Helper Functions
@@ -140,7 +141,7 @@ function stopRecording() {
 	}
 }
 
-function playAudioBuffer(base64Audio) {
+function playAudioBuffer(base64Audio, callback) {
 	try {
 		// Initialize playback context if needed
 		if (!playbackContext) {
@@ -149,6 +150,9 @@ function playAudioBuffer(base64Audio) {
 			});
 			nextPlayTime = playbackContext.currentTime;
 		}
+
+		// Store callback
+		onPlaybackComplete = callback;
 
 		// Add to queue and start processing if not already playing
 		audioQueue.push(base64Audio);
@@ -170,6 +174,10 @@ function processAudioQueue() {
 function playNextChunk() {
 	if (audioQueue.length === 0) {
 		isPlaying = false;
+		if (onPlaybackComplete) {
+			onPlaybackComplete();
+			onPlaybackComplete = null;
+		}
 		return;
 	}
 
@@ -241,6 +249,20 @@ function stopPlayback() {
 	audioQueue = [];
 	isPlaying = false;
 	nextPlayTime = 0;
+	if (onPlaybackComplete) {
+		onPlaybackComplete();
+		onPlaybackComplete = null;
+	}
 }
 
-export default { startRecording, stopRecording, playAudioBuffer, stopPlayback };
+function isCurrentlyPlaying() {
+	return isPlaying || audioQueue.length > 0;
+}
+
+export default { 
+	startRecording, 
+	stopRecording, 
+	playAudioBuffer, 
+	stopPlayback,
+	isCurrentlyPlaying 
+};

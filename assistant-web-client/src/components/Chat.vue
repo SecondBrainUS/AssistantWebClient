@@ -125,6 +125,16 @@
     <div class="border-t border-gray-700">
       <div class="max-w-3xl mx-auto p-4">
         <div class="flex items-center gap-4">
+          <!-- Add stop audio button -->
+          <button
+            v-if="isPlayingAudio"
+            @click="handleStopAudio"
+            class="p-2 rounded-full hover:bg-gray-700 transition-colors"
+            title="Stop audio playback"
+          >
+            <Square class="h-4 w-4" />
+          </button>
+
           <!-- Socket status indicator -->
           <div class="relative">
             <div 
@@ -182,7 +192,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
-import { Mic } from 'lucide-vue-next'
+import { Mic, Square } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
@@ -223,6 +233,8 @@ const roomStatus = ref('disconnected')
 const showSocketTooltip = ref(false)
 const showRoomTooltip = ref(false)
 
+const isPlayingAudio = ref(false)
+
 const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
 // Initialize socket status based on current connection state
@@ -258,6 +270,7 @@ const roomStatusMessage = computed(() => {
       return 'Unknown room status'
   }
 })
+
 
 async function loadChatMessages() {
   try {
@@ -493,7 +506,12 @@ function handleTextDelta(eventData) {
 }
 
 function handleAudioDelta(eventData) {
-  audioHandler.playAudioBuffer(eventData.delta);
+  isPlayingAudio.value = true
+  audioHandler.playAudioBuffer(eventData.delta, () => {
+    if (!audioHandler.isCurrentlyPlaying()) {
+      isPlayingAudio.value = false
+    }
+  })
 }
 
 function handleAudioTranscriptDelta(eventData) {
@@ -530,7 +548,6 @@ function handleResponseDone(eventData) {
       timestamp: new Date(eventData.timestamp)
     })
   } else if (output.type === 'message' && output.status === 'completed') {
-    // Clear current assistant message when message is complete
     currentAssistantMessage.value = null
   }
 }
@@ -802,5 +819,10 @@ function formatResultValue(value) {
 
 function isLastKey(obj, key) {
   return Object.keys(obj).pop() === key
+}
+
+function handleStopAudio() {
+  audioHandler.stopPlayback()
+  isPlayingAudio.value = false
 }
 </script>
