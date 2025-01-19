@@ -3,6 +3,12 @@ let isRecording = false;
 let audioContext = null;
 let micStream = null;
 
+let playbackContext = null;
+let audioQueue = [];
+let isPlaying = false;
+let nextPlayTime = 0;
+let currentSource = null;
+
 //=============================================
 // Helper Functions
 //=============================================
@@ -134,4 +140,107 @@ function stopRecording() {
 	}
 }
 
-export default { startRecording, stopRecording };
+function playAudioBuffer(base64Audio) {
+	try {
+		// Initialize playback context if needed
+		if (!playbackContext) {
+			playbackContext = new (window.AudioContext || window.webkitAudioContext)({
+				sampleRate: 48000  // Standard output sample rate
+			});
+			nextPlayTime = playbackContext.currentTime;
+		}
+
+		// Add to queue and start processing if not already playing
+		audioQueue.push(base64Audio);
+		if (!isPlaying) {
+			processAudioQueue();
+		}
+	} catch (error) {
+		console.error('Error queueing audio:', error);
+	}
+}
+
+function processAudioQueue() {
+	if (!isPlaying && audioQueue.length > 0) {
+		isPlaying = true;
+		playNextChunk();
+	}
+}
+
+function playNextChunk() {
+	if (audioQueue.length === 0) {
+		isPlaying = false;
+		return;
+	}
+
+	try {
+		const base64Audio = audioQueue.shift();
+		
+		// Decode base64 to binary
+		const binaryString = atob(base64Audio);
+		const bytes = new Uint8Array(binaryString.length);
+		for (let i = 0; i < binaryString.length; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		// Convert PCM16 to AudioBuffer with resampling
+		const inputSamples = Math.floor(bytes.length / 2);
+		const outputSamples = Math.floor(inputSamples * 48000 / 24000); // Resample 24kHz to 48kHz
+		const audioBuffer = playbackContext.createBuffer(1, outputSamples, 48000);
+		const channelData = audioBuffer.getChannelData(0);
+
+		// Convert and resample PCM16 to float32
+		const dataView = new DataView(bytes.buffer);
+		for (let i = 0; i < outputSamples; i++) {
+			const inputPos = i * 24000 / 48000;
+			const inputIndex = Math.floor(inputPos);
+			const fraction = inputPos - inputIndex;
+
+			// Linear interpolation between samples
+			const pcm16A = dataView.getInt16(inputIndex * 2, true);
+			const pcm16B = inputIndex < inputSamples - 1 ? 
+						  dataView.getInt16((inputIndex + 1) * 2, true) : 
+						  pcm16A;
+
+			const sampleA = pcm16A / 32768.0;
+			const sampleB = pcm16B / 32768.0;
+			channelData[i] = Math.max(-1, Math.min(1, 
+				sampleA + fraction * (sampleB - sampleA)
+			));
+		}
+
+		// Schedule playback with precise timing
+		const duration = outputSamples / 48000;
+		if (nextPlayTime < playbackContext.currentTime) {
+			nextPlayTime = playbackContext.currentTime;
+		}
+
+		const source = playbackContext.createBufferSource();
+		source.buffer = audioBuffer;
+		source.connect(playbackContext.destination);
+		source.start(nextPlayTime);
+		currentSource = source;
+
+		nextPlayTime += duration;
+		source.onended = () => {
+			currentSource = null;
+			playNextChunk();
+		};
+
+	} catch (error) {
+		console.error('Error processing audio chunk:', error);
+		playNextChunk();
+	}
+}
+
+function stopPlayback() {
+	if (currentSource) {
+		currentSource.stop();
+		currentSource = null;
+	}
+	audioQueue = [];
+	isPlaying = false;
+	nextPlayTime = 0;
+}
+
+export default { startRecording, stopRecording, playAudioBuffer, stopPlayback };

@@ -222,12 +222,6 @@ const socketStatus = ref('disconnected')
 const roomStatus = ref('disconnected')
 const showSocketTooltip = ref(false)
 const showRoomTooltip = ref(false)
-const audioContext = ref(null)
-const audioQueue = ref([])
-const isPlaying = ref(false)
-const currentSource = ref(null)
-const nextPlayTime = ref(0)
-const isProcessing = ref(false)
 
 const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
@@ -499,7 +493,7 @@ function handleTextDelta(eventData) {
 }
 
 function handleAudioDelta(eventData) {
-  playAudioBuffer(eventData.delta)
+  audioHandler.playAudioBuffer(eventData.delta);
 }
 
 function handleAudioTranscriptDelta(eventData) {
@@ -538,96 +532,6 @@ function handleResponseDone(eventData) {
   } else if (output.type === 'message' && output.status === 'completed') {
     // Clear current assistant message when message is complete
     currentAssistantMessage.value = null
-  }
-}
-
-// Audio handling functions
-function processAudioQueue() {
-  if (!isPlaying.value && audioQueue.value.length > 0) {
-    isPlaying.value = true
-    
-    const playNextChunk = () => {
-      if (audioQueue.value.length === 0) {
-        isPlaying.value = false
-        return
-      }
-
-      try {
-        const base64Audio = audioQueue.value.shift()
-        const audioBuffer = decodeAudioChunk(base64Audio)
-        playAudioChunk(audioBuffer)
-      } catch (error) {
-        console.error('Error processing audio chunk:', error)
-        playNextChunk()
-      }
-    }
-
-    playNextChunk()
-  }
-}
-
-function decodeAudioChunk(base64Audio) {
-  const binaryString = atob(base64Audio)
-  const bytes = new Uint8Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-
-  const inputSamples = Math.floor(bytes.length / 2)
-  const outputSamples = Math.floor(inputSamples * 48000 / 24000)
-  const audioBuffer = audioContext.value.createBuffer(1, outputSamples, 48000)
-  const channelData = audioBuffer.getChannelData(0)
-
-  const dataView = new DataView(bytes.buffer)
-  for (let i = 0; i < outputSamples; i++) {
-    const inputPos = i * 24000 / 48000
-    const inputIndex = Math.floor(inputPos)
-    const fraction = inputPos - inputIndex
-
-    const pcm16A = dataView.getInt16(inputIndex * 2, true)
-    const pcm16B = inputIndex < inputSamples - 1 ? 
-                  dataView.getInt16((inputIndex + 1) * 2, true) : 
-                  pcm16A
-
-    const sampleA = pcm16A / 32768.0
-    const sampleB = pcm16B / 32768.0
-    channelData[i] = Math.max(-1, Math.min(1, 
-      sampleA + fraction * (sampleB - sampleA)
-    ))
-  }
-
-  return audioBuffer
-}
-
-function playAudioChunk(audioBuffer) {
-  const duration = audioBuffer.length / 48000
-  if (nextPlayTime.value < audioContext.value.currentTime) {
-    nextPlayTime.value = audioContext.value.currentTime
-  }
-
-  const source = audioContext.value.createBufferSource()
-  source.buffer = audioBuffer
-  source.connect(audioContext.value.destination)
-  source.start(nextPlayTime.value)
-  currentSource.value = source
-
-  nextPlayTime.value += duration
-  source.onended = () => {
-    currentSource.value = null
-    processAudioQueue()
-  }
-}
-
-function playAudioBuffer(base64Audio) {
-  try {
-    if (!audioContext.value) {
-      audioContext.value = new (window.AudioContext || window.webkitAudioContext)()
-    }
-
-    audioQueue.value.push(base64Audio)
-    processAudioQueue()
-  } catch (error) {
-    console.error('Error queueing audio:', error)
   }
 }
 
@@ -798,13 +702,6 @@ onUnmounted(() => {
     props.socketClient.onRoomJoined(roomid.value, null)
     props.socketClient.onRoomError(null)
     props.socketClient.onRoomLeft(null)
-  }
-
-  if (currentSource.value) {
-    currentSource.value.stop()
-  }
-  if (audioContext.value) {
-    audioContext.value.close()
   }
 })
 
