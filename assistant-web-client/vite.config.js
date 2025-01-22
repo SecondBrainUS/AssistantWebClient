@@ -5,15 +5,16 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '@': '/src', // Short path alias
+      '@': '/src',
     },
   },
   build: {
     outDir: 'dist',
-    sourcemap: true, // Enable sourcemaps for debugging
+    sourcemap: true,
   },
   server: {
     host: true,
     port: 3000,
   },
+  envDir: './env'
 });

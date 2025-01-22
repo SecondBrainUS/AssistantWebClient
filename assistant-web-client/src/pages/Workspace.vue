@@ -204,7 +204,7 @@ async function initializeWebSocket() {
   console.log("Starting WebSocket initialization")
 
   try {
-    socketClient.value = new SocketClient('http://localhost:8900', {
+    socketClient.value = new SocketClient(import.meta.env.VITE_API_URL, {
       auth: { user_id: 'testtest' },
       namespace: '/assistant/realtime',
       autoConnect: false,
