@@ -621,7 +621,7 @@ async function handleSend(message) {
         response: {
           modalities: ['text', 'audio'],
           temperature: 0.7,
-          max_output_tokens: 1500,
+          // max_output_tokens: 1500,
         }
       }
     })
@@ -788,7 +788,7 @@ async function handleStopRecording() {
         response: {
           modalities: ['text', 'audio'],
           temperature: 0.7,
-          max_output_tokens: 1500
+          // max_output_tokens: 1500
         }
       }
     });
