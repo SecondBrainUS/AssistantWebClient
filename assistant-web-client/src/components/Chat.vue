@@ -114,7 +114,13 @@
               Audio message - awaiting transcription...
             </div>
             <div v-else>
-              {{ message.content }}
+              <div v-if="containsMarkdown(message.content)" 
+                   v-html="parseContent(message.content)"
+                   class="markdown-content"
+              ></div>
+              <div v-else>
+                {{ message.content }}
+              </div>
             </div>
           </div>
         </template>
@@ -192,6 +198,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
+import { marked } from 'marked'
 import { Mic, Square } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
@@ -271,6 +278,35 @@ const roomStatusMessage = computed(() => {
   }
 })
 
+function containsMarkdown(text) {
+  const markdownPatterns = [
+    /\*\*(.*?)\*\*/,  // Bold
+    /\*(.*?)\*/,      // Italic
+    /\[(.*?)\]\((.*?)\)/, // Links
+    /^#{1,6}\s/m,     // Headers
+    /^\d+\.\s/m,      // Numbered lists
+    /^-\s/m,          // Bullet points
+    /^>\s/m,          // Blockquotes
+    /`(.*?)`/,        // Code
+  ];
+  
+  return markdownPatterns.some(pattern => pattern.test(text));
+}
+
+function parseContent(content) {
+  if (!content || typeof content !== 'string') return '';
+  
+  // Only parse as markdown if markdown patterns are detected
+  if (containsMarkdown(content)) {
+    try {
+      return marked.parse(content, { breaks: true });
+    } catch (error) {
+      console.error('Error parsing markdown:', error);
+      return content;
+    }
+  }
+  return content;
+}
 
 async function loadChatMessages() {
   try {
@@ -826,3 +862,42 @@ function handleStopAudio() {
   isPlayingAudio.value = false
 }
 </script>
+
+<style lang="postcss">
+.markdown-content {
+  @apply text-gray-100;
+}
+
+.markdown-content p {
+  @apply mb-4;
+}
+
+.markdown-content ul {
+  @apply list-disc list-inside mb-4;
+}
+
+.markdown-content ol {
+  @apply list-decimal list-inside mb-4;
+}
+
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3, 
+.markdown-content h4, 
+.markdown-content h5, 
+.markdown-content h6 {
+  @apply font-bold mb-2 mt-4;
+}
+
+.markdown-content code {
+  @apply bg-gray-800 px-1 py-0.5 rounded;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-gray-500 pl-4 my-4;
+}
+
+.markdown-content a {
+  @apply text-blue-400 hover:underline;
+}
+</style>
