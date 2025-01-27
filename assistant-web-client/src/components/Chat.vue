@@ -11,11 +11,11 @@
     <div class="flex-1 p-4 overflow-y-auto" ref="messagesContainer">
       <div v-for="message in messages" 
            :key="message.id" 
-           class="mb-4"
+           class="mb-4 clear-both"
       >
         <!-- Function call and result grouping -->
         <div v-if="message.type === 'function_call'" 
-             class="border border-gray-600 rounded-lg p-2 mb-4"
+             class="border border-gray-600 rounded-lg p-2 mb-4 clear-both"
         >
           <div class="flex justify-between items-center mb-1">
             <div class="font-semibold">{{ message.role }}</div>
@@ -69,9 +69,16 @@
 
         <!-- Regular messages (non-function calls) -->
         <template v-else-if="message.type !== 'function_result'">
-          <div class="flex justify-between items-center mb-1">
-            <div class="flex items-center gap-2">
-              <div class="font-semibold">{{ message.role }}</div>
+          <div class="flex justify-between items-center mb-1 w-full"
+               :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
+            <div class="flex items-center gap-2"
+                 :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
+              <div class="flex items-center gap-2">
+                <div class="font-semibold">{{ message.role }}</div>
+                <div class="text-xs text-gray-400">
+                  {{ formatTimestamp(message.timestamp) }}
+                </div>
+              </div>
               <!-- Add source indicator for user messages -->
               <div v-if="message.role === 'user' && message.source" 
                    class="text-xs text-gray-400 italic">
@@ -86,27 +93,22 @@
                 </span>
               </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <div class="text-xs text-gray-400">
-                {{ formatTimestamp(message.timestamp) }}
-              </div>
-              <!-- Message status indicator -->
-              <div v-if="message.role === 'user'" class="text-xs">
-                <template v-if="messageStatuses.get(message.id) === 'sending'">
-                  <span class="text-yellow-500">Sending...</span>
-                </template>
-                <template v-else-if="messageStatuses.get(message.id) === 'sent'">
-                  <span class="text-green-500">✓</span>
-                </template>
-                <template v-else-if="messageStatuses.get(message.id) === 'error'">
-                  <span class="text-red-500">Failed to send</span>
-                </template>
-              </div>
+            <!-- Message status indicator -->
+            <div v-if="message.role === 'user'" class="text-xs">
+              <template v-if="messageStatuses.get(message.id) === 'sending'">
+                <span class="text-yellow-500">Sending...</span>
+              </template>
+              <template v-else-if="messageStatuses.get(message.id) === 'sent'">
+                <span class="text-green-500">✓</span>
+              </template>
+              <template v-else-if="messageStatuses.get(message.id) === 'error'">
+                <span class="text-red-500">Failed to send</span>
+              </template>
             </div>
           </div>
           <div :class="[
-            'p-3 rounded-lg',
-            message.role === 'user' ? 'bg-gray-600' : 
+            'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both',
+            message.role === 'user' ? 'bg-gray-600 float-right' : 
             message.role === 'assistant' ? 'bg-gray-700' :
             message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
           ]">
@@ -135,24 +137,24 @@
           <button
             v-if="isPlayingAudio"
             @click="handleStopAudio"
-            class="p-2 rounded-full hover:bg-gray-700 transition-colors"
+            class="p-2 rounded-full hover:bg-gray-700 transition-colors flex-shrink-0"
             title="Stop audio playback"
           >
             <Square class="h-4 w-4" />
           </button>
 
           <!-- Socket status indicator -->
-          <div class="relative">
-            <div 
-              class="w-3 h-3 rounded-full cursor-help"
+          <div class="relative flex items-center flex-shrink-0">
+            <Server 
+              class="h-4 w-4 cursor-help"
               :class="{
-                'bg-green-500': socketStatus === 'connected',
-                'bg-yellow-500': socketStatus === 'connecting' || socketStatus === 'reconnecting',
-                'bg-red-500': socketStatus === 'disconnected'
+                'text-green-500': socketStatus === 'connected',
+                'text-yellow-500': socketStatus === 'connecting' || socketStatus === 'reconnecting',
+                'text-red-500': socketStatus === 'disconnected'
               }"
               @mouseenter="showSocketTooltip = true"
               @mouseleave="showSocketTooltip = false"
-            ></div>
+            />
             <!-- Socket Tooltip -->
             <div 
               v-if="showSocketTooltip"
@@ -163,17 +165,17 @@
           </div>
 
           <!-- Room status indicator -->
-          <div class="relative">
-            <div 
-              class="w-3 h-3 rounded-full cursor-help"
+          <div class="relative flex items-center flex-shrink-0">
+            <MessagesSquare 
+              class="h-4 w-4 cursor-help"
               :class="{
-                'bg-green-500': roomStatus === 'connected',
-                'bg-yellow-500': roomStatus === 'connecting',
-                'bg-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
+                'text-green-500': roomStatus === 'connected',
+                'text-yellow-500': roomStatus === 'connecting',
+                'text-red-500': roomStatus === 'error' || roomStatus === 'disconnected'
               }"
               @mouseenter="showRoomTooltip = true"
               @mouseleave="showRoomTooltip = false"
-            ></div>
+            />
             <!-- Room Tooltip -->
             <div 
               v-if="showRoomTooltip"
@@ -189,6 +191,7 @@
             @send="handleSend"
             @startRecording="handleStartRecording"
             @stopRecording="handleStopRecording"
+            class="flex-grow"
           />
         </div>
       </div>
@@ -199,7 +202,7 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { marked } from 'marked'
-import { Mic, Square } from 'lucide-vue-next'
+import { Mic, Square, Server, MessagesSquare } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';

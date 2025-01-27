@@ -4,10 +4,12 @@
     <div class="flex-1 relative bg-gray-800 rounded-lg flex items-center">
       <textarea
         v-model="messageText"
+        ref="textareaRef"
         rows="1"
-        class="flex-grow bg-transparent p-4 pr-20 focus:outline-none resize-none"
+        class="flex-grow bg-transparent p-4 pr-20 focus:outline-none resize-none max-h-[144px] overflow-y-auto"
         :placeholder="placeholder"
         @keyup.enter="handleEnter"
+        @input="adjustTextareaHeight"
       ></textarea>
       
       <!-- Send Button -->
@@ -54,6 +56,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['send', 'startRecording', 'stopRecording'])
+const textareaRef = ref(null)
 const isRecording = ref(false)
 const messageText = ref(props.initialText)
 
@@ -66,7 +69,25 @@ onMounted(() => {
   if (props.startRecordingOnMount) {
     startRecording()
   }
+  // Initial height adjustment
+  adjustTextareaHeight()
 })
+
+function adjustTextareaHeight() {
+  const textarea = textareaRef.value
+  if (!textarea) return
+  
+  // Reset height to auto to get the correct scrollHeight
+  textarea.style.height = 'auto'
+  
+  // Calculate the height of one row (assuming default line-height)
+  const lineHeight = 24 // approximate line height in pixels
+  const maxHeight = lineHeight * 6 // 6 rows maximum
+  
+  // Set the height to either the scrollHeight or maxHeight, whichever is smaller
+  const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+  textarea.style.height = `${newHeight}px`
+}
 
 function handleSend() {
   if (!messageText.value.trim()) return
