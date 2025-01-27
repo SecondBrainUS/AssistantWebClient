@@ -1,5 +1,5 @@
 <template>
-  <div ref="dropdownRef" class="relative max-w-xs ml-auto flex items-center gap-4">
+  <div ref="dropdownRef" class="relative max-w-xs flex items-center gap-4">
 	<!-- Model selector button -->
     <button 
       @click="isOpen = !isOpen"

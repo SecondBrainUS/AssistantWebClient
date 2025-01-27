@@ -1,139 +1,141 @@
 <template>
-  <div class="h-full flex flex-col overflow-hidden">
-    <!-- Model selector -->
-    <div class="p-4 border-b border-gray-700">
-      <ModelSelector
-        ref="modelSelector"
-        @update:modelValue="handleModelChange"
-      />
-    </div>
-    <!-- Chat messages -->
-    <div class="flex-1 p-4 overflow-y-auto" ref="messagesContainer">
-      <div v-for="message in messages" 
-           :key="message.id" 
-           class="mb-4 clear-both"
-      >
-        <!-- Function call and result grouping -->
-        <div v-if="message.type === 'function_call'" 
-             class="border border-gray-600 rounded-lg p-2 mb-4 clear-both"
+  <div class="h-full flex flex-col overflow-hidden relative">
+    <!-- Model selector - absolute position with consistent width -->
+    <ModelSelector
+      ref="modelSelector"
+      @update:modelValue="handleModelChange"
+      class="absolute left-4 top-4 w-[280px] z-50"
+    />
+
+    <!-- Chat messages - full width container with centered content -->
+    <div class="flex-1 overflow-y-auto" ref="messagesContainer">
+      <div class="w-[60%] mx-auto px-4">
+        <div v-for="message in messages" 
+             :key="message.id" 
+             class="mb-4 clear-both"
         >
-          <div class="flex justify-between items-center mb-1">
-            <div class="font-semibold">{{ message.role }}</div>
-            <div class="text-xs text-gray-400">
-              {{ formatTimestamp(message.timestamp) }}
-            </div>
-          </div>
-          <!-- Function call -->
-          <div class="p-3 rounded-lg bg-gray-800">
-            <div class="font-mono">
-              <span style="color: #dcdc90">{{ message.name }}</span>
-              <span style="color: #f1d700">(</span>
-              <span style="color: #b670d6">
-                {
-                <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                  <span style="color: #9cdcfe">{{ key }}</span>
-                  <span style="color: #9cdcfe">: </span>
-                  <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
-                </span>
-                }
-              </span>
-              <span style="color: #f1d700">)</span>
-            </div>
-          </div>
-          <!-- Function result -->
-          <div v-if="getFunctionResult(message.call_id)" 
-               class="mt-2 p-3 rounded-lg bg-gray-700"
+          <!-- Function call and result grouping -->
+          <div v-if="message.type === 'function_call'" 
+               class="border border-gray-600 rounded-lg p-2 mb-4 clear-both w-fit max-w-[80%]"
           >
             <div class="flex justify-between items-center mb-1">
-              <div class="font-semibold">Result</div>
+              <div class="font-semibold">{{ message.role }}</div>
               <div class="text-xs text-gray-400">
-                {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                {{ formatTimestamp(message.timestamp) }}
               </div>
             </div>
-            <div class="font-mono">
-              <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
-                <span style="color: #b670d6">{</span>
-                <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
-                  <span style="color: #9cdcfe">{{ key }}</span>
-                  <span style="color: #9cdcfe">: </span>
-                  <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+            <!-- Function call -->
+            <div class="p-3 rounded-lg bg-gray-800">
+              <div class="font-mono">
+                <span style="color: #dcdc90">{{ message.name }}</span>
+                <span style="color: #f1d700">(</span>
+                <span style="color: #b670d6">
+                  {
+                  <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
+                    <span style="color: #9cdcfe">{{ key }}</span>
+                    <span style="color: #9cdcfe">: </span>
+                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
+                  </span>
+                  }
                 </span>
-                <span style="color: #b670d6">}</span>
-              </template>
-              <template v-else>
-                <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
-              </template>
+                <span style="color: #f1d700">)</span>
+              </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Regular messages (non-function calls) -->
-        <template v-else-if="message.type !== 'function_result'">
-          <div class="flex justify-between items-center mb-1 w-full"
-               :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
-            <div class="flex items-center gap-2"
-                 :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
-              <div class="flex items-center gap-2">
-                <div class="font-semibold">{{ message.role }}</div>
+            <!-- Function result -->
+            <div v-if="getFunctionResult(message.call_id)" 
+                 class="mt-2 p-3 rounded-lg bg-gray-700"
+            >
+              <div class="flex justify-between items-center mb-1">
+                <div class="font-semibold">Result</div>
                 <div class="text-xs text-gray-400">
-                  {{ formatTimestamp(message.timestamp) }}
+                  {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
                 </div>
               </div>
-              <!-- Add source indicator for user messages -->
-              <div v-if="message.role === 'user' && message.source" 
-                   class="text-xs text-gray-400 italic">
-                (other session)
+              <div class="font-mono">
+                <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
+                  <span style="color: #b670d6">{</span>
+                  <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                    <span style="color: #9cdcfe">{{ key }}</span>
+                    <span style="color: #9cdcfe">: </span>
+                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                  </span>
+                  <span style="color: #b670d6">}</span>
+                </template>
+                <template v-else>
+                  <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
+                </template>
               </div>
-              <!-- Add audio indicator -->
-              <div v-if="message.isAudio" 
-                   class="text-xs text-gray-400 flex items-center gap-1">
-                <Mic class="h-4 w-4" />
-                <span v-if="message.awaitingTranscription" class="italic">
-                  Transcribing...
-                </span>
-              </div>
-            </div>
-            <!-- Message status indicator -->
-            <div v-if="message.role === 'user'" class="text-xs">
-              <template v-if="messageStatuses.get(message.id) === 'sending'">
-                <span class="text-yellow-500">Sending...</span>
-              </template>
-              <template v-else-if="messageStatuses.get(message.id) === 'sent'">
-                <span class="text-green-500">✓</span>
-              </template>
-              <template v-else-if="messageStatuses.get(message.id) === 'error'">
-                <span class="text-red-500">Failed to send</span>
-              </template>
             </div>
           </div>
-          <div :class="[
-            'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both',
-            message.role === 'user' ? 'bg-gray-600 float-right' : 
-            message.role === 'assistant' ? 'bg-gray-700' :
-            message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
-          ]">
-            <div v-if="message.awaitingTranscription" class="text-gray-400 italic">
-              Audio message - awaiting transcription...
+
+          <!-- Regular messages (non-function calls) -->
+          <template v-else-if="message.type !== 'function_result'">
+            <div class="flex justify-between items-center mb-1 w-full"
+                 :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
+              <div class="flex items-center gap-2"
+                   :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
+                <div class="flex items-center gap-2">
+                  <div class="font-semibold">{{ message.role }}</div>
+                  <div class="text-xs text-gray-400">
+                    {{ formatTimestamp(message.timestamp) }}
+                  </div>
+                </div>
+                <!-- Add source indicator for user messages -->
+                <div v-if="message.role === 'user' && message.source" 
+                     class="text-xs text-gray-400 italic">
+                  (other session)
+                </div>
+                <!-- Add audio indicator -->
+                <div v-if="message.isAudio" 
+                     class="text-xs text-gray-400 flex items-center gap-1">
+                  <Mic class="h-4 w-4" />
+                  <span v-if="message.awaitingTranscription" class="italic">
+                    Transcribing...
+                  </span>
+                </div>
+              </div>
+              <!-- Message status indicator -->
+              <div v-if="message.role === 'user'" class="text-xs">
+                <template v-if="messageStatuses.get(message.id) === 'sending'">
+                  <span class="text-yellow-500">Sending...</span>
+                </template>
+                <template v-else-if="messageStatuses.get(message.id) === 'sent'">
+                  <span class="text-green-500">✓</span>
+                </template>
+                <template v-else-if="messageStatuses.get(message.id) === 'error'">
+                  <span class="text-red-500">Failed to send</span>
+                </template>
+              </div>
             </div>
-            <div v-else>
-              <div v-if="containsMarkdown(message.content)" 
-                   v-html="parseContent(message.content)"
-                   class="markdown-content"
-              ></div>
+            <div :class="[
+              'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both',
+              message.role === 'user' ? 'bg-gray-600 float-right' : 
+              message.role === 'assistant' ? 'bg-gray-700' :
+              message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
+            ]">
+              <div v-if="message.awaitingTranscription" class="text-gray-400 italic">
+                Audio message - awaiting transcription...
+              </div>
               <div v-else>
-                {{ message.content }}
+                <div v-if="containsMarkdown(message.content)" 
+                     v-html="parseContent(message.content)"
+                     class="markdown-content"
+                ></div>
+                <div v-else>
+                  {{ message.content }}
+                </div>
               </div>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
       </div>
     </div>
 
-    <!-- Input area -->
+    <!-- Input area - adjusted width -->
     <div class="border-t border-gray-700">
-      <div class="max-w-3xl mx-auto p-4">
-        <div class="flex items-center gap-4">
-          <!-- Add stop audio button -->
+      <div class="w-[60%] mx-auto p-4">
+        <div class="flex items-center gap-4 max-w-2xl mx-auto">
+          <!-- Audio and status controls -->
           <button
             v-if="isPlayingAudio"
             @click="handleStopAudio"
@@ -156,10 +158,7 @@
               @mouseleave="showSocketTooltip = false"
             />
             <!-- Socket Tooltip -->
-            <div 
-              v-if="showSocketTooltip"
-              class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
-            >
+            <div v-if="showSocketTooltip" class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50">
               {{ socketStatusMessage }}
             </div>
           </div>
@@ -177,10 +176,7 @@
               @mouseleave="showRoomTooltip = false"
             />
             <!-- Room Tooltip -->
-            <div 
-              v-if="showRoomTooltip"
-              class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50"
-            >
+            <div v-if="showRoomTooltip" class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded whitespace-nowrap z-50">
               {{ roomStatusMessage }}
             </div>
           </div>
