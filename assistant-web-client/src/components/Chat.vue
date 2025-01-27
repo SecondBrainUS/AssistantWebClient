@@ -16,16 +16,18 @@
         >
           <!-- Function call and result grouping -->
           <div v-if="message.type === 'function_call'" 
-               class="border border-gray-600 rounded-lg p-2 mb-4 clear-both w-fit max-w-[80%]"
+               class="bg-[#171717] rounded-lg p-2 pb-4 px-3 mb-4 clear-both w-fit max-w-[80%]"
           >
+            <!-- Function call -->
             <div class="flex justify-between items-center mb-1">
-              <div class="font-semibold">{{ message.role }}</div>
-              <div class="text-xs text-gray-400">
-                {{ formatTimestamp(message.timestamp) }}
+              <div class="flex items-center gap-2">
+                <Wrench class="h-4 w-4" />
+                <div class="text-xs text-gray-400">
+                  {{ formatTimestamp(message.timestamp) }}
+                </div>
               </div>
             </div>
-            <!-- Function call -->
-            <div class="p-3 rounded-lg bg-gray-800">
+            <div class="p-3 rounded-lg bg-[#222222]">
               <div class="font-mono">
                 <span style="color: #dcdc90">{{ message.name }}</span>
                 <span style="color: #f1d700">(</span>
@@ -42,28 +44,30 @@
               </div>
             </div>
             <!-- Function result -->
-            <div v-if="getFunctionResult(message.call_id)" 
-                 class="mt-2 p-3 rounded-lg bg-gray-700"
-            >
+            <div v-if="getFunctionResult(message.call_id)" class="mt-2">
               <div class="flex justify-between items-center mb-1">
-                <div class="font-semibold">Result</div>
-                <div class="text-xs text-gray-400">
-                  {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                <div class="flex items-center gap-2">
+                  <ArrowRight class="h-4 w-4" />
+                  <div class="text-xs text-gray-400">
+                    {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                  </div>
                 </div>
               </div>
-              <div class="font-mono">
-                <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
-                  <span style="color: #b670d6">{</span>
-                  <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
-                    <span style="color: #9cdcfe">{{ key }}</span>
-                    <span style="color: #9cdcfe">: </span>
-                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
-                  </span>
-                  <span style="color: #b670d6">}</span>
-                </template>
-                <template v-else>
-                  <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
-                </template>
+              <div class="p-3 rounded-lg bg-[#222222]">
+                <div class="font-mono">
+                  <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
+                    <span style="color: #b670d6">{</span>
+                    <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                      <span style="color: #9cdcfe">{{ key }}</span>
+                      <span style="color: #9cdcfe">: </span>
+                      <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                    </span>
+                    <span style="color: #b670d6">}</span>
+                  </template>
+                  <template v-else>
+                    <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
@@ -76,8 +80,20 @@
                    :class="[message.role === 'user' ? 'flex-row-reverse' : '']">
                 <div class="flex items-center gap-2">
                   <div class="font-semibold">{{ message.role }}</div>
-                  <div class="text-xs text-gray-400">
+                  <div class="text-xs text-gray-400 flex items-center gap-1">
                     {{ formatTimestamp(message.timestamp) }}
+                    <!-- Message status indicator -->
+                    <template v-if="message.role === 'user'">
+                      <template v-if="messageStatuses.get(message.id) === 'sending'">
+                        <Check class="h-4 w-4 text-yellow-500" />
+                      </template>
+                      <template v-else-if="messageStatuses.get(message.id) === 'sent'">
+                        <CheckCheck class="h-4 w-4 text-green-500" />
+                      </template>
+                      <template v-else-if="messageStatuses.get(message.id) === 'error'">
+                        <AlertCircle class="h-4 w-4 text-red-500" />
+                      </template>
+                    </template>
                   </div>
                 </div>
                 <!-- Add source indicator for user messages -->
@@ -94,18 +110,6 @@
                   </span>
                 </div>
               </div>
-              <!-- Message status indicator -->
-              <div v-if="message.role === 'user'" class="text-xs">
-                <template v-if="messageStatuses.get(message.id) === 'sending'">
-                  <span class="text-yellow-500">Sending...</span>
-                </template>
-                <template v-else-if="messageStatuses.get(message.id) === 'sent'">
-                  <span class="text-green-500">✓</span>
-                </template>
-                <template v-else-if="messageStatuses.get(message.id) === 'error'">
-                  <span class="text-red-500">Failed to send</span>
-                </template>
-              </div>
             </div>
             <div :class="[
               'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both',
@@ -121,7 +125,7 @@
                      v-html="parseContent(message.content)"
                      class="markdown-content"
                 ></div>
-                <div v-else>
+                <div v-else class="text-white">
                   {{ message.content }}
                 </div>
               </div>
@@ -198,7 +202,17 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { marked } from 'marked'
-import { Mic, Square, Server, MessagesSquare } from 'lucide-vue-next'
+import { 
+  Mic, 
+  Square, 
+  Server, 
+  MessagesSquare, 
+  Wrench, 
+  ArrowRight,
+  Check,
+  CheckCheck,
+  AlertCircle 
+} from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
@@ -625,13 +639,12 @@ async function handleSend(message) {
   try {
     messageStatuses.value.set(localMessageId, 'sending')
     
-    const newMessage = {
+    messages.value.push({
       id: localMessageId,
       role: 'user',
       content: message,
-      timestamp: new Date()
-    }
-    messages.value.push(newMessage)
+      timestamp: new Date().toISOString()
+    })
 
     const item = {
       id: localMessageId,
