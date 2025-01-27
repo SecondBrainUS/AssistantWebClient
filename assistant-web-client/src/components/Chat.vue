@@ -9,7 +9,7 @@
 
     <!-- Chat messages - full width container with centered content -->
     <div class="flex-1 overflow-y-auto" ref="messagesContainer">
-      <div class="w-[60%] mx-auto px-4">
+      <div class="max-w-[770px] w-[90%] mx-auto px-4">
         <div v-for="message in messages" 
              :key="message.id" 
              class="mb-4 clear-both"
@@ -133,7 +133,7 @@
 
     <!-- Input area - adjusted width -->
     <div class="border-t border-gray-700">
-      <div class="w-[60%] mx-auto p-4">
+      <div class="max-w-[720px] w-[90%] mx-auto p-4">
         <div class="flex items-center gap-4 max-w-2xl mx-auto">
           <!-- Audio and status controls -->
           <button
@@ -309,22 +309,21 @@ function parseContent(content) {
 
 async function loadChatMessages() {
   try {
-    // Load messages for the selected chat
     const dbMessages = await baseApi.get(`/chat/${props.chatid}/messages`)
     
     messages.value = dbMessages.data.map(msg => ({
       ...msg,
       id: msg.message_id,
-      timestamp: new Date(msg.created_timestamp)
+      timestamp: msg.created_timestamp
     }))
     console.log("Loaded chat messages:", JSON.stringify(messages.value, null, 2))
   } catch (error) {
     console.error('Error loading chat messages:', error)
     emit('notification', {
       type: 'error',
-        message: 'Failed to load chat messages',
-        id: Date.now()
-      })
+      message: 'Failed to load chat messages',
+      id: Date.now()
+    })
   }
 }
 
@@ -494,7 +493,9 @@ function handleFunctionResultDone(eventData) {
     name: eventData.response.name,
     call_id: eventData.response.call_id,
     result: eventData.response.result,
+    // Ensure timestamp is in local time
     timestamp: new Date(eventData.response.created_timestamp)
+
   })
 }
 
@@ -580,6 +581,7 @@ function handleResponseDone(eventData) {
       name: output.name,
       call_id: output.call_id,
       arguments: output.arguments,
+      // Ensure timestamp is in local time
       timestamp: new Date(eventData.timestamp)
     })
   } else if (output.type === 'message' && output.status === 'completed') {
@@ -771,8 +773,21 @@ function scrollToBottom() {
 
 function formatTimestamp(timestamp) {
   if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  
+  try {
+    const normalizedTimestamp = timestamp.endsWith('Z') || timestamp.includes('+') 
+      ? timestamp 
+      : timestamp + 'Z'
+    
+    return new Date(normalizedTimestamp).toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch (error) {
+    console.error('Error formatting timestamp:', error)
+    return ''
+  }
 }
 
 // Recording handlers
