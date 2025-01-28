@@ -54,7 +54,7 @@
                 </div>
               </div>
               <div class="p-3 rounded-lg bg-[#222222]">
-                <div class="font-mono">
+                <div class="font-mono break-all whitespace-pre-wrap">
                   <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
                     <span style="color: #b670d6">{</span>
                     <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
