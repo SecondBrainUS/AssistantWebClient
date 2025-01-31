@@ -208,7 +208,7 @@ class SocketClient {
       })
 
       // Emit room creation request
-      this.socket.emit("create_room", { chat_id: chatid, model_id: modelid })
+      this.socket.emit("create_room", { chat_id: chatid, model_api_source: "openai_realtime", model_id: modelid })
     })
   }
 
