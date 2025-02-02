@@ -56,6 +56,7 @@ async function createNewChat() {
   try {
     const newChat = await baseApi.post('/chat', { 
       model_id: selectedModel.value.model_id,
+      model_api_source: selectedModel.value.model_api_source
     })
     return newChat.data.chat_id;
   } catch (error) {

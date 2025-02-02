@@ -64,6 +64,7 @@ const emit = defineEmits(['update:modelValue', 'modelsLoaded'])
 
 const LOADING_MODEL = Object.freeze({
   model_id: -1,
+  model_api_source: '',
   display_name: 'Loading...',
   full_name: '',
   description: 'Please wait...',
@@ -73,6 +74,7 @@ const LOADING_MODEL = Object.freeze({
 
 const ERROR_MODEL = Object.freeze({
   model_id: -2,
+  model_api_source: '',
   display_name: 'Error loading models',
   full_name: '',
   description: 'Please try again later',
@@ -105,7 +107,6 @@ const selectedModel = computed({
     }
   }
 })
-
 
 function selectModel(model) {
   selectedModel.value = model
