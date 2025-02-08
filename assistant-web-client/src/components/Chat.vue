@@ -490,16 +490,80 @@ async function handleSocketMessage(eventData) {
     case 'response.done':
       handleResponseDone(eventData)
       break
+    case 'sbaw.text_message.user':
+      handleSBAWTextMessageUser(eventData);
+      break
+    case 'sbaw.text_message.assistant':
+      handleSBAWTextMessageAssistant(eventData);
+      break
+    case 'sbaw.function_call':
+      handleSBAWFunctionCall(eventData);
+      break
+    case 'sbaw.function_result':
+      handleSBAWFunctionResult(eventData);
+      break
   }
-
   await nextTick()
   scrollToBottom()
 }
 
+function handleSBAWFunctionCall(eventData) {
+  console.log("[CHAT] [HANDLE FUNCTION CALL]: ", eventData)
+  messages.value.push({
+    id: eventData.id,
+    call_id: eventData.call_id,
+    type: eventData.type,
+    role: eventData.role,
+    name: output.name,
+    arguments: output.arguments,
+    timestamp: new Date(eventData.created_timestamp)
+  })
+}
+
+function handleSBAWFunctionResult(eventData) {
+  console.log("[CHAT] [HANDLE FUNCTION RESULT]: ", eventData)
+  messages.value.push({
+    id: eventData.id,
+    call_id: eventData.call_id,
+    type: eventData.type,
+    role: eventData.role,
+    name: eventData.name,
+    result: eventData.result,
+    timestamp: new Date(eventData.created_timestamp)
+  })
+}
+
+function handleSBAWTextMessageUser(eventData) {
+  console.log("[CHAT] [HANDLE SBAW TEXT MEESAGE USER] Event data:", eventData)
+  // If this message isn't in our messageStatuses, it came from another session
+  const source = !messageStatuses.value.has(eventData.id) ? 'other-session' : null
+  messages.value.push({
+    id: eventData.id,
+    role: eventData.role,
+    content: eventData.content,
+    model_id: eventData.model_id,
+    modality: eventData.modality,
+    timestamp: new Date(eventData.created_timestamp),
+    source
+  });
+}
+
+function handleSBAWTextMessageAssistant(eventData) {
+  messages.value.push({
+    id: eventData.id,
+    role: eventData.role,
+    content: eventData.content,
+    model_id: eventData.model_id,
+    modality: eventData.modality,
+    timestamp: new Date(eventData.created_timestamp),
+    token_usage: eventData.token_usage,
+    stop_reason: eventData.stop_reason,
+    source
+  });
+}
+
 function handleFunctionResultDone(eventData) {
   console.log("[CHAT] [HANDLE FUNCTION RESULT DONE] Event data:", eventData)
-  
-  // Add function result message
   messages.value.push({
     id: eventData.response.message_id,
     type: 'function_result',
@@ -507,9 +571,7 @@ function handleFunctionResultDone(eventData) {
     name: eventData.response.name,
     call_id: eventData.response.call_id,
     result: eventData.response.result,
-    // Ensure timestamp is in local time
     timestamp: new Date(eventData.response.created_timestamp)
-
   })
 }
 
