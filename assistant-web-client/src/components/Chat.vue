@@ -754,6 +754,7 @@ async function handleSendSBAW(message) {
   messageStatuses.value.set(localMessageId, 'sending')
   messages.value.push({
     id: localMessageId,
+    type: 'message',
     role: 'user',
     content: message,
     model_id: selectedModel.value.model_id,
@@ -764,10 +765,9 @@ async function handleSendSBAW(message) {
     id: localMessageId,
     type: 'message',
     role: 'user',
-    content: [{
-      type: 'input_text',
-      text: message
-    }]
+    model_id: selectedModel.value.model_id,
+    modality: 'text',
+    content: message
   }
 
   const messageData = {
