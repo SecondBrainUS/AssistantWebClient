@@ -401,7 +401,7 @@ async function findRoom() {
       roomid = roomData.roomid
     } else {
       // Create room
-      const roomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id);
+      const roomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id, selectedModel.value.model_api_source);
       console.log("[WORKSPACE] [SELECT CHAT] Room created for chat:", roomData)
       roomid = roomData.roomid
     }
@@ -456,7 +456,7 @@ async function rejoinChat() {
     if (roomData.room_id) {
       await props.socketClient.joinRoom(roomData.room_id)
     } else {
-      const newRoomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id)
+      const newRoomData = await props.socketClient.createRoom(props.chatid, selectedModel.value.model_id, selectedModel.value.model_api_source)
       await props.socketClient.joinRoom(newRoomData.room_id)
     }
   } catch (error) {
@@ -697,6 +697,11 @@ async function handleSend(message) {
     return
   }
 
+  if (selectedModel.value.model_api_source == "aisuite") {
+    handleSendSBAW(message);
+    return;
+  }
+
   const localMessageId = Date.now().toString()
   try {
     messageStatuses.value.set(localMessageId, 'sending')
@@ -741,6 +746,41 @@ async function handleSend(message) {
     console.error('Error sending message:', error)
     messageStatuses.value.set(localMessageId, 'error')
   }
+}
+
+async function handleSendSBAW(message) {
+  console.log(message);
+  const localMessageId = Date.now().toString()
+  messageStatuses.value.set(localMessageId, 'sending')
+  messages.value.push({
+    id: localMessageId,
+    role: 'user',
+    content: message,
+    model_id: selectedModel.value.model_id,
+    modality: 'text',
+    timestamp: new Date().toISOString()
+  });
+  const item = {
+    id: localMessageId,
+    type: 'message',
+    role: 'user',
+    content: [{
+      type: 'input_text',
+      text: message
+    }]
+  }
+
+  const messageData = {
+    type: "sbaw.incoming.text_message.user",
+    data: { item }
+  }
+  try {
+    await props.socketClient.sendMessage(roomid.value, messageData, selectedModel.value.model_id)
+  } catch (error) {
+    console.error('Error sending message:', error)
+    messageStatuses.value.set(localMessageId, 'error')
+  }
+  
 }
 
 function handleModelChange(model) {

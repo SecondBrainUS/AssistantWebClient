@@ -14,7 +14,26 @@
     <!-- Dropdown menu -->
     <div v-if="isOpen && selectedModel" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
       <div class="p-2 space-y-1">
-        <div v-for="model in models" :key="model.model_id" class="p-2">
+        <!-- API Source Filter -->
+        <div class="p-2 border-b border-gray-700">
+          <select
+            v-model="selectedApiSource"
+            class="w-full bg-gray-700 text-sm rounded-lg p-2"
+          >
+            <option :value="null" class="bg-gray-800 text-white">All</option>
+            <option 
+              v-for="source in apiSources" 
+              :key="source" 
+              :value="source"
+              class="bg-gray-800 text-white"
+            >
+              {{ source }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Model List - Updated to use filteredModels -->
+        <div v-for="model in filteredModels" :key="model.model_id" class="p-2">
           <button 
             @click="selectModel(model)"
             class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
@@ -108,6 +127,20 @@ const selectedModel = computed({
   }
 })
 
+const selectedApiSource = ref(null)
+
+// Get unique API sources from models
+const apiSources = computed(() => {
+  const sources = [...new Set(models.value.map(m => m.model_api_source))]
+  return sources.filter(source => source) // Remove any null/undefined values
+})
+
+// Filter models based on selected API source
+const filteredModels = computed(() => {
+  if (!selectedApiSource.value) return models.value
+  return models.value.filter(m => m.model_api_source === selectedApiSource.value)
+})
+
 function selectModel(model) {
   selectedModel.value = model
   isOpen.value = false
@@ -118,6 +151,7 @@ async function loadModels() {
   isLoading.value = true
   try {
     const response = await baseApi.get('/model')
+    console.log(response);
     models.value = response.data.models
     
     // If modelId prop is provided, select that model
