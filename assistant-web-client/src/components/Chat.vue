@@ -509,56 +509,60 @@ async function handleSocketMessage(eventData) {
 
 function handleSBAWFunctionCall(eventData) {
   console.log("[CHAT] [HANDLE FUNCTION CALL]: ", eventData)
+  const data = eventData.data
   messages.value.push({
-    id: eventData.id,
-    call_id: eventData.call_id,
-    type: eventData.type,
-    role: eventData.role,
-    name: output.name,
-    arguments: output.arguments,
-    timestamp: new Date(eventData.created_timestamp)
+    id: data.id,
+    call_id: data.call_id,
+    type: data.type,
+    role: data.role,
+    name: data.name,
+    arguments: data.arguments,
+    timestamp: new Date(data.created_timestamp)
   })
 }
 
 function handleSBAWFunctionResult(eventData) {
   console.log("[CHAT] [HANDLE FUNCTION RESULT]: ", eventData)
+  const data = eventData.data
   messages.value.push({
-    id: eventData.id,
-    call_id: eventData.call_id,
-    type: eventData.type,
-    role: eventData.role,
-    name: eventData.name,
-    result: eventData.result,
-    timestamp: new Date(eventData.created_timestamp)
+    id: data.id,
+    call_id: data.call_id,
+    type: data.type,
+    role: data.role,
+    name: data.name,
+    result: data.result,
+    timestamp: new Date(data.created_timestamp)
   })
 }
 
 function handleSBAWTextMessageUser(eventData) {
   console.log("[CHAT] [HANDLE SBAW TEXT MEESAGE USER] Event data:", eventData)
   // If this message isn't in our messageStatuses, it came from another session
-  const source = !messageStatuses.value.has(eventData.id) ? 'other-session' : null
+  const data = eventData.data
+  const source = !messageStatuses.value.has(data.id) ? 'other-session' : null
   messages.value.push({
-    id: eventData.id,
-    role: eventData.role,
-    content: eventData.content,
-    model_id: eventData.model_id,
-    modality: eventData.modality,
-    timestamp: new Date(eventData.created_timestamp),
-    source
+    id: data.id,
+    role: data.role,
+    content: data.content,
+    model_id: data.model_id,
+    modality: data.modality,
+    timestamp: new Date(data.created_timestamp),
+    source: source
   });
 }
 
 function handleSBAWTextMessageAssistant(eventData) {
+  console.log("[CHAT] [HANDLE SBAW TEXT MESSAGE ASSISTANT] Event data:", eventData)
+  const data = eventData.data
   messages.value.push({
-    id: eventData.id,
-    role: eventData.role,
-    content: eventData.content,
-    model_id: eventData.model_id,
-    modality: eventData.modality,
-    timestamp: new Date(eventData.created_timestamp),
-    token_usage: eventData.token_usage,
-    stop_reason: eventData.stop_reason,
-    source
+    id: data.id,
+    role: data.role,
+    content: data.content,
+    model_id: data.model_id,
+    modality: data.modality,
+    timestamp: new Date(data.created_timestamp),
+    token_usage: data.token_usage,
+    stop_reason: data.stop_reason,
   });
 }
 
@@ -890,6 +894,16 @@ function formatTimestamp(timestamp) {
   if (!timestamp) return ''
   
   try {
+    // Handle Date objects directly
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    }
+    
+    // Handle string timestamps as before
     const normalizedTimestamp = timestamp.endsWith('Z') || timestamp.includes('+') 
       ? timestamp 
       : timestamp + 'Z'
