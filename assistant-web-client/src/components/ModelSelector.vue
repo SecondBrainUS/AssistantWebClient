@@ -14,13 +14,14 @@
     <!-- Dropdown menu -->
     <div v-if="isOpen && selectedModel" class="absolute w-full mt-2 bg-gray-800 rounded-lg shadow-lg z-50 top-full">
       <div class="p-2 space-y-1">
-        <!-- API Source Filter -->
-        <div class="p-2 border-b border-gray-700">
+        <!-- Filters Section -->
+        <div class="p-2 border-b border-gray-700 space-y-2">
+          <!-- API Source Filter -->
           <select
             v-model="selectedApiSource"
             class="w-full bg-gray-700 text-sm rounded-lg p-2"
           >
-            <option :value="null" class="bg-gray-800 text-white">All</option>
+            <option :value="null" class="bg-gray-800 text-white">All Sources</option>
             <option 
               v-for="source in apiSources" 
               :key="source" 
@@ -28,6 +29,22 @@
               class="bg-gray-800 text-white"
             >
               {{ source }}
+            </option>
+          </select>
+
+          <!-- Provider Filter -->
+          <select
+            v-model="selectedProvider"
+            class="w-full bg-gray-700 text-sm rounded-lg p-2"
+          >
+            <option :value="null" class="bg-gray-800 text-white">All Providers</option>
+            <option 
+              v-for="provider in providers" 
+              :key="provider" 
+              :value="provider"
+              class="bg-gray-800 text-white"
+            >
+              {{ provider }}
             </option>
           </select>
         </div>
@@ -128,6 +145,7 @@ const selectedModel = computed({
 })
 
 const selectedApiSource = ref(null)
+const selectedProvider = ref(null)
 
 // Get unique API sources from models
 const apiSources = computed(() => {
@@ -135,10 +153,25 @@ const apiSources = computed(() => {
   return sources.filter(source => source) // Remove any null/undefined values
 })
 
-// Filter models based on selected API source
+// Get unique providers from models
+const providers = computed(() => {
+  const providerList = [...new Set(models.value.map(m => m.provider))]
+  return providerList.filter(provider => provider) // Remove any null/undefined values
+})
+
+// Update filteredModels to include provider filter
 const filteredModels = computed(() => {
-  if (!selectedApiSource.value) return models.value
-  return models.value.filter(m => m.model_api_source === selectedApiSource.value)
+  let filtered = models.value
+  
+  if (selectedApiSource.value) {
+    filtered = filtered.filter(m => m.model_api_source === selectedApiSource.value)
+  }
+  
+  if (selectedProvider.value) {
+    filtered = filtered.filter(m => m.provider === selectedProvider.value)
+  }
+  
+  return filtered
 })
 
 function selectModel(model) {
