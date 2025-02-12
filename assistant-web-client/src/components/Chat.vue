@@ -516,7 +516,7 @@ function handleSBAWFunctionCall(eventData) {
     type: data.type,
     role: data.role,
     name: data.name,
-    arguments: data.arguments,
+    arguments: JSON.stringify(data.arguments),
     timestamp: new Date(data.created_timestamp)
   })
 }
@@ -776,10 +776,13 @@ async function handleSendSBAW(message) {
 
   const messageData = {
     type: "sbaw.incoming.text_message.user",
-    data: { item }
+    data: { item },
+    id: localMessageId,
   }
   try {
-    await props.socketClient.sendMessage(roomid.value, messageData, selectedModel.value.model_id)
+    const sendResult = await props.socketClient.sendMessage(roomid.value, messageData, selectedModel.value.model_id)
+    console.log("[CHAT] [HANDLE SEND SBAW] Send result:", sendResult)
+    messageStatuses.value.set(localMessageId, 'sent')
   } catch (error) {
     console.error('Error sending message:', error)
     messageStatuses.value.set(localMessageId, 'error')
