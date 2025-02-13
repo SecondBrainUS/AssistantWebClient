@@ -137,11 +137,13 @@
               </div>
             </div>
             <div :class="[
-              'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both',
+              'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both relative',
               message.role === 'user' ? 'bg-gray-600 float-right' : 
-              message.role === 'assistant' ? 'bg-gray-700' :
+              message.role === 'assistant' ? 'bg-gray-700 cursor-pointer hover:bg-gray-600 transition-colors' :
               message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
-            ]">
+            ]"
+            @click="message.usage && toggleTokenUsage(message.id)"
+            >
               <div v-if="message.awaitingTranscription" class="text-gray-400 italic">
                 Audio message - awaiting transcription...
               </div>
@@ -154,6 +156,30 @@
                   {{ message.content }}
                 </div>
               </div>
+
+              <!-- Token Usage Display -->
+              <Transition
+                enter-active-class="transition ease-out duration-200"
+                enter-from-class="opacity-0 translate-x-2"
+                enter-to-class="opacity-100 translate-x-0"
+                leave-active-class="transition ease-in duration-150"
+                leave-from-class="opacity-100 translate-x-0"
+                leave-to-class="opacity-0 translate-x-2"
+              >
+                <div v-if="showTokenUsage === message.id && message.usage" 
+                     class="absolute left-full ml-4 top-0 bg-gray-800 rounded-lg p-3 text-sm text-gray-300 whitespace-nowrap"
+                >
+                  <div class="font-medium mb-2">Token Usage:</div>
+                  <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                    <div class="text-gray-400">Total:</div>
+                    <div>{{ message.usage?.total_tokens || 'N/A' }}</div>
+                    <div class="text-gray-400">Input:</div>
+                    <div>{{ message.usage?.input_tokens || 'N/A' }}</div>
+                    <div class="text-gray-400">Output:</div>
+                    <div>{{ message.usage?.output_tokens || 'N/A' }}</div>
+                  </div>
+                </div>
+              </Transition>
             </div>
           </template>
         </div>
