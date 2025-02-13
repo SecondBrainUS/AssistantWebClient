@@ -72,11 +72,6 @@
           />
         </div>
 
-        <!-- Chat selector -->
-        <div class="flex items-center space-x-2 p-2 hover:bg-gray-700 rounded mb-4 cursor-pointer">
-          <!--MessageSquare class="h-5 w-5" / -->
-        </div>
-
         <!-- Navigation sections -->
         <div class="flex-1 overflow-y-auto space-y-4 max-h-[calc(100vh-1rem)]">
           <div v-for="(section, index) in filteredChatSections" :key="index">
