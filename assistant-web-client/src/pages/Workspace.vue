@@ -55,7 +55,7 @@
       </div>
 
       <!-- Navigation sections -->
-      <div class="flex-1 overflow-y-auto space-y-4">
+      <div class="flex-1 overflow-y-auto space-y-4 max-h-[calc(100vh-1rem)]">
         <div v-for="(section, index) in filteredChatSections" :key="index">
           <div v-if="isSidebarOpen" class="text-xs text-gray-500 px-2 py-1">{{ section.title }}</div>
           <div class="space-y-1">
@@ -147,7 +147,7 @@ const notifications = ref([])
 const isLoadingChats = ref(false)
 const chatPage = ref(0)
 const hasMoreChats = ref(true)
-const chatsPerPage = 20
+const chatsPerPage = 50
 const deleteHoverStates = ref({})
 
 const chatSections = ref([{ chats: [] }])
@@ -454,5 +454,11 @@ function handleNotification(notification) {
 html, body, #app {
   height: 100%;
   margin: 0;
+}
+
+/* Add styles to ensure proper scrolling behavior */
+.overflow-y-auto {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 </style>
