@@ -95,6 +95,12 @@
                 </div>
               </div>
             </Transition>
+
+            <!-- Add error display -->
+            <div v-if="message.error" 
+                 class="text-red-500 text-sm mt-1 px-3 py-2 bg-red-900/20 rounded-lg">
+              {{ message.error }}
+            </div>
           </div>
 
           <!-- Regular messages (non-function calls) -->
@@ -180,6 +186,12 @@
                   </div>
                 </div>
               </Transition>
+
+              <!-- Add error display -->
+              <div v-if="message.error" 
+                   class="text-red-500 text-sm mt-1 px-3 py-2 bg-red-900/20 rounded-lg">
+                {{ message.error }}
+              </div>
             </div>
           </template>
         </div>
@@ -443,6 +455,23 @@ async function setupSocketHandlers() {
       console.error('Error processing message:', error)
     }
   })
+
+  // Add message error handler
+  props.socketClient.onMessageError((data) => {
+    console.log("[CHAT] [ON MESSAGE ERROR] Error data:", data);
+    console.log("[CHAT] [ON MESSAGE ERROR] Current messages:", messages.value);
+    
+    const message = messages.value.find(m => 
+      m.id === data.message_id || m.id === data.client_message_id
+    );
+    
+    console.log("[CHAT] [ON MESSAGE ERROR] Found message:", message);
+    
+    if (message) {
+      message.error = data.error;
+      messageStatuses.value.set(message.id, 'error');
+    }
+  });
 }
 
 async function findRoom() {
