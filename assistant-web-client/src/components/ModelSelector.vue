@@ -56,7 +56,14 @@
               @click="selectModel(model)"
               class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
             >
-              <div class="text-sm font-medium">{{ model.display_name }}</div>
+              <div class="flex items-center gap-2">
+                <div class="text-sm font-medium">{{ model.display_name }}</div>
+                <Star 
+                  v-if="model.is_favorite" 
+                  class="h-3 w-3 text-white fill-white" 
+                  stroke-width="1.5"
+                />
+              </div>
               <div class="text-xs text-gray-400">{{ model.description }}</div>
             </button>
           </div>
@@ -88,7 +95,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onClickOutside } from '@vueuse/core'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, Star } from 'lucide-vue-next'
 import baseApi from '../utils/baseApi'
 
 const props = defineProps({
@@ -161,7 +168,7 @@ const providers = computed(() => {
   return providerList.filter(provider => provider) // Remove any null/undefined values
 })
 
-// Update filteredModels to include provider filter
+// Update filteredModels computed property
 const filteredModels = computed(() => {
   let filtered = models.value
   
@@ -173,7 +180,12 @@ const filteredModels = computed(() => {
     filtered = filtered.filter(m => m.provider === selectedProvider.value)
   }
   
-  return filtered
+  // Sort by is_favorite (favorites first)
+  return filtered.sort((a, b) => {
+    if (a.is_favorite && !b.is_favorite) return -1;
+    if (!a.is_favorite && b.is_favorite) return 1;
+    return 0;
+  });
 })
 
 function selectModel(model) {
