@@ -16,7 +16,8 @@
         >
           <!-- Function call and result grouping -->
           <div v-if="message.type === 'function_call'" 
-               class="bg-[#171717] rounded-lg p-2 pb-4 px-3 mb-4 clear-both w-fit max-w-[80%]"
+               class="bg-[#171717] rounded-lg p-2 pb-4 px-3 mb-4 clear-both w-fit max-w-[80%] relative"
+               @click="toggleTokenUsage(message.id)"
           >
             <!-- Function call -->
             <div class="flex justify-between items-center mb-1">
@@ -70,6 +71,30 @@
                 </div>
               </div>
             </div>
+
+            <!-- Token Usage Display -->
+            <Transition
+              enter-active-class="transition ease-out duration-200"
+              enter-from-class="opacity-0 translate-x-2"
+              enter-to-class="opacity-100 translate-x-0"
+              leave-active-class="transition ease-in duration-150"
+              leave-from-class="opacity-100 translate-x-0"
+              leave-to-class="opacity-0 translate-x-2"
+            >
+              <div v-if="showTokenUsage === message.id" 
+                   class="absolute left-full ml-4 top-0 bg-gray-800 rounded-lg p-3 text-sm text-gray-300 whitespace-nowrap"
+              >
+                <div class="font-medium mb-2">Token Usage:</div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                  <div class="text-gray-400">Total:</div>
+                  <div>{{ message.usage?.total_tokens || 'N/A' }}</div>
+                  <div class="text-gray-400">Input:</div>
+                  <div>{{ message.usage?.input_tokens || 'N/A' }}</div>
+                  <div class="text-gray-400">Output:</div>
+                  <div>{{ message.usage?.output_tokens || 'N/A' }}</div>
+                </div>
+              </div>
+            </Transition>
           </div>
 
           <!-- Regular messages (non-function calls) -->
@@ -256,6 +281,9 @@ const showRoomTooltip = ref(false)
 const isPlayingAudio = ref(false)
 
 const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
+
+// Add new ref for token usage display
+const showTokenUsage = ref(null)
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -661,6 +689,7 @@ function handleResponseDone(eventData) {
       name: output.name,
       call_id: output.call_id,
       arguments: output.arguments,
+      usage: eventData.response.usage,
       // Ensure timestamp is in local time
       timestamp: new Date(eventData.timestamp)
     })
@@ -1007,6 +1036,11 @@ function handleStopAudio() {
   audioHandler.stopPlayback()
   isPlayingAudio.value = false
 }
+
+// Add new function to toggle token usage display
+function toggleTokenUsage(messageId) {
+  showTokenUsage.value = showTokenUsage.value === messageId ? null : messageId
+}
 </script>
 
 <style lang="postcss">
@@ -1045,5 +1079,10 @@ function handleStopAudio() {
 
 .markdown-content a {
   @apply text-blue-400 hover:underline;
+}
+
+/* Add cursor pointer for function call messages */
+[v-if="message.type === 'function_call'"] {
+  @apply cursor-pointer hover:bg-[#1a1a1a] transition-colors;
 }
 </style>
