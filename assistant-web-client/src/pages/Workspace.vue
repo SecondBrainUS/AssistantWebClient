@@ -20,79 +20,103 @@
     <div 
       :class="[
         'bg-gray-800 p-4 flex flex-col border-r border-gray-700 transition-all duration-300 ease-in-out',
-        isSidebarOpen ? 'w-64' : 'w-20'
+        isSidebarOpen ? 'w-64' : 'w-14'
       ]"
     >
       <!-- Top section -->
-      <div class="flex items-center justify-between mb-4">
+      <div 
+        :class="[
+          'flex transition-all duration-300 ease-in-out',
+          isSidebarOpen ? 'items-center justify-between' : 'flex-col items-center space-y-4'
+        ]"
+      >
         <button @click="toggleSidebar" class="p-2 hover:bg-gray-700 rounded">
           <Menu class="h-5 w-5" />
         </button>
-        <div class="flex items-center space-x-2" v-if="isSidebarOpen">
-          <button @click="toggleSearch" class="p-2 hover:bg-gray-700 rounded">
+        <!-- Icons container with animated positioning -->
+        <div 
+          :class="[
+            'flex transition-opacity duration-150 ease-in-out',
+            isSidebarOpen ? 
+              'items-center space-x-2' : 
+              'flex-col space-y-2'
+          ]"
+        >
+          <button 
+            @click="toggleSearch" 
+            class="p-2 hover:bg-gray-700 rounded opacity-0"
+            :class="{ 'opacity-100': isSidebarOpen || !isAnimating }"
+          >
             <Search class="h-5 w-5" />
           </button>
-          <button @click="onNewChat" class="p-2 hover:bg-gray-700 rounded">
+          <button 
+            @click="onNewChat" 
+            class="p-2 hover:bg-gray-700 rounded opacity-0"
+            :class="{ 'opacity-100': isSidebarOpen || !isAnimating }"
+          >
             <PenSquare class="h-5 w-5" />
           </button>
         </div>
       </div>
 
-      <!-- Search bar -->
-      <div v-if="isSearchOpen && isSidebarOpen" class="mb-4">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search chats..."
-          class="w-full bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-600"
-          @input="filterChats"
-        />
-      </div>
+      <!-- Only show the rest of the content when sidebar is open -->
+      <template v-if="isSidebarOpen">
+        <!-- Search bar -->
+        <div v-if="isSearchOpen" class="mb-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search chats..."
+            class="w-full bg-gray-700 text-white placeholder-gray-400 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            @input="filterChats"
+          />
+        </div>
 
-      <!-- Chat selector -->
-      <div v-if="isSidebarOpen" class="flex items-center space-x-2 p-2 hover:bg-gray-700 rounded mb-4 cursor-pointer">
-        <!--MessageSquare class="h-5 w-5" / -->
-      </div>
+        <!-- Chat selector -->
+        <div class="flex items-center space-x-2 p-2 hover:bg-gray-700 rounded mb-4 cursor-pointer">
+          <!--MessageSquare class="h-5 w-5" / -->
+        </div>
 
-      <!-- Navigation sections -->
-      <div class="flex-1 overflow-y-auto space-y-4 max-h-[calc(100vh-1rem)]">
-        <div v-for="(section, index) in filteredChatSections" :key="index">
-          <div v-if="isSidebarOpen" class="text-xs text-gray-500 px-2 py-1">{{ section.title }}</div>
-          <div class="space-y-1">
-            <div
-              v-for="chat in section.chats"
-              :key="chat.chatid"
-              @click="selectChat(chat.chatid)"
-              class="px-2 py-1 hover:bg-gray-700 rounded cursor-pointer flex items-center justify-between group"
-              :class="{ 'bg-gray-700': selectedChatId === chat.chatid }"
-            >
-              <div class="flex items-center">
-                <MessageSquare v-if="!isSidebarOpen" class="h-5 w-5" />
-                <span v-else>{{ chat.title }}</span>
-              </div>
-              <!-- Add delete button -->
-              <button 
-                v-if="isSidebarOpen"
-                @click.stop="confirmDeleteChat(chat.chatid)"
-                class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-600 rounded"
+        <!-- Navigation sections -->
+        <div class="flex-1 overflow-y-auto space-y-4 max-h-[calc(100vh-1rem)]">
+          <div v-for="(section, index) in filteredChatSections" :key="index">
+            <div class="text-xs text-gray-500 px-2 py-1">{{ section.title }}</div>
+            <div class="space-y-1">
+              <div
+                v-for="chat in section.chats"
+                :key="chat.chatid"
+                @click="selectChat(chat.chatid)"
+                class="px-2 py-1 hover:bg-gray-700 rounded cursor-pointer flex items-center justify-between group"
+                :class="{ 'bg-gray-700': selectedChatId === chat.chatid }"
               >
-                <component 
-                  :is="deleteHoverStates[chat.chatid] ? Trash2 : TrashIcon"
-                  class="h-4 w-4 transition-colors"
-                  :class="deleteHoverStates[chat.chatid] ? 'text-red-500' : 'text-gray-400'"
-                  @mouseenter="deleteHoverStates[chat.chatid] = true"
-                  @mouseleave="deleteHoverStates[chat.chatid] = false"
-                />
-              </button>
+                <div class="flex items-center">
+                  <MessageSquare v-if="!isSidebarOpen" class="h-5 w-5" />
+                  <span v-else>{{ chat.title }}</span>
+                </div>
+                <!-- Add delete button -->
+                <button 
+                  v-if="isSidebarOpen"
+                  @click.stop="confirmDeleteChat(chat.chatid)"
+                  class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-600 rounded"
+                >
+                  <component 
+                    :is="deleteHoverStates[chat.chatid] ? Trash2 : TrashIcon"
+                    class="h-4 w-4 transition-colors"
+                    :class="deleteHoverStates[chat.chatid] ? 'text-red-500' : 'text-gray-400'"
+                    @mouseenter="deleteHoverStates[chat.chatid] = true"
+                    @mouseleave="deleteHoverStates[chat.chatid] = false"
+                  />
+                </button>
+              </div>
             </div>
           </div>
+          
+          <!-- Loading indicator -->
+          <div v-if="isLoadingChats" class="flex justify-center py-4">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+          </div>
         </div>
-        
-        <!-- Loading indicator -->
-        <div v-if="isLoadingChats" class="flex justify-center py-4">
-          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
-        </div>
-      </div>
+      </template>
     </div>
 
     <!-- Main content -->
@@ -149,6 +173,7 @@ const chatPage = ref(0)
 const hasMoreChats = ref(true)
 const chatsPerPage = 50
 const deleteHoverStates = ref({})
+const isAnimating = ref(false)
 
 const chatSections = ref([{ chats: [] }])
 const organizedChatSections = computed(() => {
@@ -237,10 +262,14 @@ async function selectChat(chatid) {
 }
 
 function toggleSidebar() {
+  isAnimating.value = true
   isSidebarOpen.value = !isSidebarOpen.value
   if (!isSidebarOpen.value) {
     isSearchOpen.value = false
   }
+  setTimeout(() => {
+    isAnimating.value = false
+  }, 150)
 }
 
 function toggleSearch() {
