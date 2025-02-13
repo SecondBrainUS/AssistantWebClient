@@ -49,15 +49,17 @@
           </select>
         </div>
 
-        <!-- Model List - Updated to use filteredModels -->
-        <div v-for="model in filteredModels" :key="model.model_id" class="p-2">
-          <button 
-            @click="selectModel(model)"
-            class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
-          >
-            <div class="text-sm font-medium">{{ model.display_name }}</div>
-            <div class="text-xs text-gray-400">{{ model.description }}</div>
-          </button>
+        <!-- Model List - Updated with dynamic height -->
+        <div class="max-h-[calc(60vh-8rem)] overflow-y-auto">
+          <div v-for="model in filteredModels" :key="model.model_id" class="p-2">
+            <button 
+              @click="selectModel(model)"
+              class="w-full text-left hover:bg-gray-700 p-2 rounded-lg"
+            >
+              <div class="text-sm font-medium">{{ model.display_name }}</div>
+              <div class="text-xs text-gray-400">{{ model.description }}</div>
+            </button>
+          </div>
         </div>
         
         <!-- Toggles -->
