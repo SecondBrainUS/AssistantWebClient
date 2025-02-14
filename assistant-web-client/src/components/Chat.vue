@@ -265,6 +265,10 @@
 <script setup>
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { marked } from 'marked'
+import { markedHighlight } from "marked-highlight";
+import hljs from 'highlight.js';
+// Import a theme - choose one that matches your dark UI
+import 'highlight.js/styles/github-dark.css';
 import { 
   Mic, 
   Square, 
@@ -356,6 +360,30 @@ const roomStatusMessage = computed(() => {
       return 'Unknown room status'
   }
 })
+
+// Initialize marked with highlight.js
+marked.use(markedHighlight({
+  langPrefix: 'hljs language-',
+  highlight(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { 
+          language: lang,
+          ignoreIllegals: true 
+        }).value;
+      } catch (err) {
+        console.error('Highlight.js error:', err);
+      }
+    }
+    // Fallback to auto-detection
+    try {
+      return hljs.highlightAuto(code).value;
+    } catch (err) {
+      console.error('Highlight.js error:', err);
+    }
+    return code; // Fallback to plain text
+  }
+}));
 
 function containsMarkdown(text) {
   const markdownPatterns = [
@@ -1139,5 +1167,25 @@ function toggleTokenUsage(messageId) {
 /* Add cursor pointer for function call messages */
 [v-if="message.type === 'function_call'"] {
   @apply cursor-pointer hover:bg-[#1a1a1a] transition-colors;
+}
+
+/* Update code block styles for highlight.js */
+.markdown-content pre {
+  @apply bg-gray-800 p-4 rounded-lg mb-4 overflow-x-auto;
+}
+
+.markdown-content pre code {
+  @apply bg-transparent p-0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Optional: Style inline code differently */
+.markdown-content :not(pre) > code {
+  @apply bg-gray-800 px-1.5 py-0.5 rounded text-sm;
+}
+
+/* Ensure highlight.js styles work well with dark theme */
+.hljs {
+  @apply bg-transparent;
 }
 </style>
