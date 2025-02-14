@@ -145,7 +145,7 @@
             <div :class="[
               'p-3 rounded-lg break-words inline-block max-w-[60%] mb-4 clear-both relative',
               message.role === 'user' ? 'bg-gray-600 float-right' : 
-              message.role === 'assistant' ? 'bg-gray-700 cursor-pointer hover:bg-gray-600 transition-colors' :
+              message.role === 'assistant' ? 'bg-gray-700 cursor-pointer hover:bg-gray-600 transition-colors max-w-[75%]' :
               message.role === 'system' ? 'bg-gray-800' : 'bg-gray-700'
             ]"
             @click="message.usage && toggleTokenUsage(message.id)"
@@ -419,11 +419,21 @@ async function loadChatMessages() {
   try {
     const dbMessages = await baseApi.get(`/chat/${props.chatid}/messages`)
     
-    messages.value = dbMessages.data.map(msg => ({
-      ...msg,
-      id: msg.message_id,
-      timestamp: msg.created_timestamp
-    }))
+    messages.value = dbMessages.data.map(msg => {
+      // Transform token usage field names if present
+      const transformedUsage = msg.usage ? {
+        input_tokens: msg.usage.prompt_tokens,
+        output_tokens: msg.usage.completion_tokens,
+        total_tokens: msg.usage.total_tokens
+      } : null;
+
+      return {
+        ...msg,
+        id: msg.message_id,
+        timestamp: msg.created_timestamp,
+        usage: transformedUsage
+      }
+    })
     console.log("Loaded chat messages:", JSON.stringify(messages.value, null, 2))
   } catch (error) {
     console.error('Error loading chat messages:', error)
@@ -665,6 +675,14 @@ function handleSBAWTextMessageUser(eventData) {
 function handleSBAWTextMessageAssistant(eventData) {
   console.log("[CHAT] [HANDLE SBAW TEXT MESSAGE ASSISTANT] Event data:", eventData)
   const data = eventData.data
+  
+  // Transform token usage field names
+  const transformedUsage = data.token_usage ? {
+    input_tokens: data.token_usage.prompt_tokens,
+    output_tokens: data.token_usage.completion_tokens,
+    total_tokens: data.token_usage.total_tokens
+  } : null;
+
   messages.value.push({
     id: data.id,
     role: data.role,
@@ -672,7 +690,7 @@ function handleSBAWTextMessageAssistant(eventData) {
     model_id: data.model_id,
     modality: data.modality,
     timestamp: new Date(data.created_timestamp),
-    token_usage: data.token_usage,
+    usage: transformedUsage,
     stop_reason: data.stop_reason,
   });
 }
