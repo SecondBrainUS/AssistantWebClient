@@ -156,6 +156,40 @@ class SocketClient {
     });
   }
 
+  sendEvent(roomid, event) {
+    if (!this.isConnected) {
+      throw new Error("Socket is not connected. Call connect() first.")
+    }
+    console.log("Sending event:", { room_id: roomid, event: event })
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Event send timed out"));
+      }, 30000); // 30 second timeout
+
+      const eventid = new Date().getTime().toString()
+      event.id = eventid
+      // Set up one-time listener for message confirmation
+      this.socket.once(`event_sent ${eventid}`, (data) => {
+        clearTimeout(timeoutId);
+        console.log("[SOCKET] [SEND EVENT] Event sent:", data);
+        resolve(data);
+      });
+
+      // Set up one-time listener for message error
+      this.socket.once(`event_error ${eventid}`, (error) => {
+        clearTimeout(timeoutId);
+        console.error("[SOCKET] [SEND EVENT] Event send failed:", error);
+        reject(error);
+      });
+
+      // Emit the message
+      this.socket.emit("event", { 
+        room_id: roomid, 
+        event: event 
+      });
+    });
+  }
+
   onRoomMessage(roomid, callback) {
     console.log("Setting up room message listener for room:", roomid)
     if (!this.socket || !this.isConnected) {

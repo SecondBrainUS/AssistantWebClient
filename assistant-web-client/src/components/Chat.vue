@@ -200,8 +200,9 @@
 
     <!-- Input area - adjusted width -->
     <div class="border-t border-gray-700">
-      <div class="max-w-[720px] w-[90%] mx-auto p-4">
-        <div class="flex items-center gap-4 max-w-2xl mx-auto">
+      <div class="max-w-[770px] w-[90%] mx-auto p-4">
+        <!-- Added relative positioning to parent container -->
+        <div class="relative flex items-center gap-4 max-w-2xl mx-auto">
           <!-- Audio and status controls -->
           <button
             v-if="isPlayingAudio"
@@ -248,14 +249,28 @@
             </div>
           </div>
 
-          <ChatInput 
-            :initial-text="pendingMessage"
-            :start-recording-on-mount="startRecording"
-            @send="handleSend"
-            @startRecording="handleStartRecording"
-            @stopRecording="handleStopRecording"
-            class="flex-grow"
-          />
+          <!-- ChatInput -->
+          <div class="flex-grow">
+            <ChatInput 
+              :initial-text="pendingMessage"
+              :start-recording-on-mount="startRecording"
+              @send="handleSend"
+              @startRecording="handleStartRecording"
+              @stopRecording="handleStopRecording"
+              class="w-full"
+            />
+          </div>
+
+          <!-- Stop processing button - positioned absolutely -->
+          <button 
+            v-if="isProcessing" 
+            @click="handleStopProcessing" 
+            type="button"
+            class="absolute -right-12 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-700 focus:outline-none"
+            title="Stop processing"
+          >
+            <XCircle class="h-5 w-5 text-red-500" />
+          </button>
         </div>
       </div>
     </div>
@@ -267,7 +282,6 @@ import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { marked } from 'marked'
 import { markedHighlight } from "marked-highlight";
 import hljs from 'highlight.js';
-// Import a theme - choose one that matches your dark UI
 import 'highlight.js/styles/github-dark.css';
 import { 
   Mic, 
@@ -278,7 +292,8 @@ import {
   ArrowRight,
   Check,
   CheckCheck,
-  AlertCircle 
+  AlertCircle,
+  XCircle
 } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
@@ -324,8 +339,8 @@ const isPlayingAudio = ref(false)
 
 const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
-// Add new ref for token usage display
 const showTokenUsage = ref(null)
+const isProcessing = ref(false);
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -658,7 +673,6 @@ function handleSBAWFunctionResult(eventData) {
 
 function handleSBAWTextMessageUser(eventData) {
   console.log("[CHAT] [HANDLE SBAW TEXT MEESAGE USER] Event data:", eventData)
-  // If this message isn't in our messageStatuses, it came from another session
   const data = eventData.data
   const source = !messageStatuses.value.has(data.id) ? 'other-session' : null
   messages.value.push({
@@ -693,6 +707,7 @@ function handleSBAWTextMessageAssistant(eventData) {
     usage: transformedUsage,
     stop_reason: data.stop_reason,
   });
+  isProcessing.value = false;
 }
 
 function handleFunctionResultDone(eventData) {
@@ -917,7 +932,7 @@ async function handleSendSBAW(message) {
     console.error('Error sending message:', error)
     messageStatuses.value.set(localMessageId, 'error')
   }
-  
+  isProcessing.value = true;
 }
 
 function handleModelChange(model) {
@@ -1141,6 +1156,24 @@ function handleStopAudio() {
 // Add new function to toggle token usage display
 function toggleTokenUsage(messageId) {
   showTokenUsage.value = showTokenUsage.value === messageId ? null : messageId
+}
+
+// New function to handle "stop processing"
+async function handleStopProcessing() {
+  console.log("[CHAT] Stop processing triggered");
+  try {
+    await props.socketClient.sendEvent(roomid.value, {
+      type: "sbaw.assistant.stop_processing"
+    });
+  } catch (error) {
+    console.error("[CHAT] Error stopping processing:", error);
+    emit('notification', {
+      type: 'error',
+      message: 'Failed to stop processing',
+      id: Date.now()
+    });
+  }
+  isProcessing.value = false;
 }
 </script>
 
