@@ -12,12 +12,13 @@
         @input="adjustTextareaHeight"
       ></textarea>
       
-      <!-- Send Button -->
+      <!-- Send/Stop Button -->
       <button 
-        @click="handleSend" 
+        @click="isProcessing ? handleStopProcessing() : handleSend()" 
         class="p-2 mr-1 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
       >
-        <Send class="h-6 w-6" />
+        <XCircle v-if="isProcessing" class="h-6 w-6 text-red-500" />
+        <Send v-else class="h-6 w-6" />
       </button>
       
       <!-- Record Button -->
@@ -38,7 +39,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { Send, Mic, Square } from 'lucide-vue-next'
+import { Send, Mic, Square, XCircle } from 'lucide-vue-next'
 
 const props = defineProps({
   placeholder: {
@@ -52,10 +53,14 @@ const props = defineProps({
   startRecordingOnMount: {
     type: Boolean,
     default: false
+  },
+  isProcessing: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['send', 'startRecording', 'stopRecording'])
+const emit = defineEmits(['send', 'startRecording', 'stopRecording', 'stopProcessing'])
 const textareaRef = ref(null)
 const isRecording = ref(false)
 const messageText = ref(props.initialText)
@@ -109,5 +114,9 @@ function startRecording() {
 function stopRecording() {
   isRecording.value = false
   emit('stopRecording')
+}
+
+function handleStopProcessing() {
+  emit('stopProcessing')
 }
 </script>

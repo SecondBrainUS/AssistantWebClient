@@ -203,7 +203,7 @@
       <div class="max-w-[770px] w-[90%] mx-auto p-4">
         <!-- Added relative positioning to parent container -->
         <div class="relative flex items-center gap-4 max-w-2xl mx-auto">
-          <!-- Audio and status controls -->
+          <!-- Audio and status controls on the left -->
           <button
             v-if="isPlayingAudio"
             @click="handleStopAudio"
@@ -249,28 +249,52 @@
             </div>
           </div>
 
-          <!-- ChatInput -->
+          <!-- ChatInput in the middle -->
           <div class="flex-grow">
             <ChatInput 
               :initial-text="pendingMessage"
               :start-recording-on-mount="startRecording"
+              :is-processing="isProcessing"
               @send="handleSend"
               @startRecording="handleStartRecording"
               @stopRecording="handleStopRecording"
+              @stopProcessing="handleStopProcessing"
               class="w-full"
             />
           </div>
 
-          <!-- Stop processing button - positioned absolutely -->
-          <button 
-            v-if="isProcessing" 
-            @click="handleStopProcessing" 
-            type="button"
-            class="absolute -right-12 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-700 focus:outline-none"
-            title="Stop processing"
-          >
-            <XCircle class="h-5 w-5 text-red-500" />
-          </button>
+          <!-- Tools Menu Button on the right -->
+          <div class="relative flex-shrink-0">
+            <button
+              @click="showToolsMenu = !showToolsMenu"
+              class="p-2 rounded-full hover:bg-gray-700 transition-colors"
+              title="Tools"
+            >
+              <MoreVertical class="h-4 w-4" />
+            </button>
+
+            <!-- Tools Menu Popup -->
+            <Transition
+              enter-active-class="transition ease-out duration-200"
+              enter-from-class="opacity-0 translate-y-1"
+              enter-to-class="opacity-100 translate-y-0"
+              leave-active-class="transition ease-in duration-150"
+              leave-from-class="opacity-100 translate-y-0"
+              leave-to-class="opacity-0 translate-y-1"
+            >
+              <div v-if="showToolsMenu" 
+                   class="absolute bottom-full right-0 mb-2 bg-gray-800 rounded-lg shadow-lg py-2 min-w-[160px]">
+                <button 
+                  @click="handlePromptCompiler"
+                  class="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <Wand2 class="h-4 w-4" />
+                  <span>Prompt Compiler</span>
+                </button>
+                <!-- Add more tools here as needed -->
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
     </div>
@@ -293,7 +317,9 @@ import {
   Check,
   CheckCheck,
   AlertCircle,
-  XCircle
+  XCircle,
+  MoreVertical,
+  Wand2
 } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
@@ -341,6 +367,8 @@ const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
 const showTokenUsage = ref(null)
 const isProcessing = ref(false);
+
+const showToolsMenu = ref(false)
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -1175,6 +1203,12 @@ async function handleStopProcessing() {
     });
   }
   isProcessing.value = false;
+}
+
+function handlePromptCompiler() {
+  showToolsMenu.value = false
+  // Add your prompt compiler logic here
+  console.log('Prompt Compiler clicked')
 }
 </script>
 
