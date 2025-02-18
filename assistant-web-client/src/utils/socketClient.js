@@ -169,9 +169,9 @@ class SocketClient {
       const eventid = new Date().getTime().toString()
       event.id = eventid
       // Set up one-time listener for message confirmation
-      this.socket.once(`event_sent ${eventid}`, (data) => {
+      this.socket.once(`event_received ${eventid}`, (data) => {
         clearTimeout(timeoutId);
-        console.log("[SOCKET] [SEND EVENT] Event sent:", data);
+        console.log("[SOCKET] [SEND EVENT] Event received:", data);
         resolve(data);
       });
 

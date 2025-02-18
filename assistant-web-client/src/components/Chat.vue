@@ -1163,8 +1163,9 @@ async function handleStopProcessing() {
   console.log("[CHAT] Stop processing triggered");
   try {
     await props.socketClient.sendEvent(roomid.value, {
-      type: "sbaw.assistant.stop_processing"
+      type: "sbaw.assistant.stop_processing",
     });
+    isProcessing.value = false;
   } catch (error) {
     console.error("[CHAT] Error stopping processing:", error);
     emit('notification', {
