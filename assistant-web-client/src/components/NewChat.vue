@@ -13,11 +13,16 @@
     </div>
     <div class="p-4">
       <div class="max-w-3xl mx-auto">
-        <ChatInput 
-          placeholder="Type to start a new chat..."
-          @send="handleNewChat"
-          @startRecording="handleStartRecording"
-        />
+        <div class="relative flex items-center gap-4">
+          <div class="flex-grow">
+            <ChatInput 
+              placeholder="Type to start a new chat..."
+              @send="handleNewChat"
+              @startRecording="handleStartRecording"
+            />
+          </div>
+          <ToolsMenu @promptCompiler="handlePromptCompiler" />
+        </div>
       </div>
     </div>
   </div>
@@ -27,6 +32,7 @@
 import { defineEmits, ref } from 'vue'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
+import ToolsMenu from './ToolsMenu.vue'
 import baseApi from '../utils/baseApi';
 
 const emit = defineEmits(['createChat', 'startRecording', 'notification'])
@@ -64,5 +70,10 @@ async function createNewChat() {
     emit('notification', { message: 'Error creating new chat', type: 'error' });
     return null;
   }
+}
+
+function handlePromptCompiler() {
+  console.log('Prompt Compiler clicked in NewChat')
+  // Add your prompt compiler logic here
 }
 </script>
