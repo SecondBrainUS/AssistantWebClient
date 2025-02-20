@@ -3,7 +3,14 @@
     <div class="bg-gray-900 rounded-lg w-[90vw] max-w-6xl h-[80vh] flex flex-col">
       <!-- Header -->
       <div class="p-4 border-b border-gray-700 flex justify-between items-center">
-        <h2 class="text-xl font-semibold">Prompt Compiler</h2>
+        <div class="flex items-center gap-4">
+          <h2 class="text-xl font-semibold">Prompt Compiler</h2>
+          <ModelSelector
+            ref="modelSelector"
+            @update:modelValue="handleModelChange"
+            class="w-[280px]"
+          />
+        </div>
         <button @click="$emit('close')" class="p-2 hover:bg-gray-700 rounded-lg">
           <X class="h-5 w-5" />
         </button>
@@ -21,16 +28,59 @@
                   <span class="text-gray-500 text-xs ml-2">{{ param.description }}</span>
                 </label>
 
+                <!-- String with enum -->
+                <div v-if="param.type === 'string' && param.enum" class="flex gap-2">
+                  <select 
+                    v-model="formData[param.name]"
+                    :id="param.name"
+                    class="flex-1 bg-gray-800 rounded-lg p-2"
+                  >
+                    <option value="">Select from options...</option>
+                    <option v-for="option in param.enum" :key="option" :value="option">
+                      {{ option }}
+                    </option>
+                  </select>
+                  <input 
+                    type="text"
+                    v-model="formData[param.name]"
+                    :id="`${param.name}-custom`"
+                    class="flex-1 bg-gray-800 rounded-lg p-2"
+                    placeholder="Or type custom value"
+                  />
+                </div>
+
                 <!-- Array with enum -->
-                <select v-if="param.type === 'array' && param.enum" 
-                        v-model="formData[param.name]" 
-                        :id="param.name" 
-                        multiple
-                        class="w-full bg-gray-800 rounded-lg p-2">
-                  <option v-for="option in param.enum" :key="option" :value="option">
-                    {{ option }}
-                  </option>
-                </select>
+                <div v-else-if="param.type === 'array' && param.enum" class="space-y-2">
+                  <div class="flex flex-wrap gap-2">
+                    <span v-for="(item, index) in formData[param.name]" 
+                          :key="index"
+                          class="bg-gray-700 px-2 py-1 rounded-lg flex items-center gap-1">
+                      {{ item }}
+                      <button @click="removeArrayItem(param.name, index)" type="button">
+                        <X class="h-3 w-3" />
+                      </button>
+                    </span>
+                  </div>
+                  <div class="flex gap-2">
+                    <!-- Dropdown for enum values -->
+                    <select 
+                      class="flex-1 bg-gray-800 rounded-lg p-2"
+                      @change="handleEnumSelect(param.name, $event.target.value)"
+                    >
+                      <option value="">Select from options...</option>
+                      <option v-for="option in param.enum" :key="option" :value="option">
+                        {{ option }}
+                      </option>
+                    </select>
+                    <!-- Manual input -->
+                    <input type="text" 
+                           :id="param.name"
+                           v-model="arrayInputs[param.name]"
+                           @keydown.enter.prevent="addArrayItem(param.name)"
+                           class="flex-1 bg-gray-800 rounded-lg p-2"
+                           placeholder="Or type custom value and press Enter" />
+                  </div>
+                </div>
 
                 <!-- Array without enum (free text input with tags) -->
                 <div v-else-if="param.type === 'array'" class="space-y-2">
@@ -110,6 +160,7 @@
 import { ref, reactive } from 'vue'
 import { X } from 'lucide-vue-next'
 import baseApi from '../utils/baseApi'
+import ModelSelector from './ModelSelector.vue'
 
 const emit = defineEmits(['close'])
 const promptText = ref('')
@@ -117,12 +168,18 @@ const showForm = ref(false)
 const parameters = ref([])
 const formData = reactive({})
 const arrayInputs = reactive({})
+const modelSelector = ref(null)
+const selectedModel = ref(null)
+
+function handleModelChange(model) {
+  selectedModel.value = model
+}
 
 async function generateParameters() {
   try {
     const response = await baseApi.post('/prompt_compiler/compile', {
       prompt: promptText.value,
-      modelid: 'anthropic:claude-3-opus-20240229', // You might want to make this configurable
+      modelid: selectedModel.value?.model_id || 'anthropic:claude-3-opus-20240229',
       use_tools: true
     })
     
@@ -158,12 +215,20 @@ function removeArrayItem(paramName, index) {
   formData[paramName].splice(index, 1)
 }
 
+function handleEnumSelect(paramName, value) {
+  if (!value) return
+  if (!Array.isArray(formData[paramName])) {
+    formData[paramName] = []
+  }
+  formData[paramName].push(value)
+}
+
 async function compilePrompt() {
   try {
     const response = await baseApi.post('/prompt_compiler/compile', {
       prompt: promptText.value,
-      modelid: 'anthropic:claude-3-opus-20240229', // You might want to make this configurable
-      use_tools: false // Don't generate parameters on final compilation
+      modelid: selectedModel.value?.model_id || 'anthropic:claude-3-opus-20240229',
+      use_tools: false
     })
     emit('close', response.data.expanded_prompt)
   } catch (error) {
