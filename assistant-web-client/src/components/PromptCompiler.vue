@@ -1,17 +1,17 @@
 <template>
   <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="bg-gray-900 rounded-lg w-[90vw] max-w-6xl h-[80vh] flex flex-col">
+    <div class="bg-gray-800 rounded-lg w-[90vw] max-w-6xl h-[80vh] flex flex-col">
       <!-- Header -->
       <div class="p-4 border-b border-gray-700 flex justify-between items-center">
         <div class="flex items-center gap-4">
-          <h2 class="text-xl font-semibold">Prompt Compiler</h2>
+          <h2 class="text-xl font-semibold text-gray-100">Prompt Compiler</h2>
           <ModelSelector
             ref="modelSelector"
             @update:modelValue="handleModelChange"
             class="w-[280px]"
           />
         </div>
-        <button @click="$emit('close')" class="p-2 hover:bg-gray-700 rounded-lg">
+        <button @click="$emit('close')" class="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-gray-100">
           <X class="h-5 w-5" />
         </button>
       </div>
@@ -23,9 +23,9 @@
           <div v-if="showForm" class="flex-1 overflow-y-auto">
             <form @submit.prevent="handleSubmit" class="space-y-4">
               <div v-for="param in parameters" :key="param.name" class="space-y-2">
-                <label :for="param.name" class="block text-sm font-medium">
+                <label :for="param.name" class="block text-sm font-medium text-gray-200">
                   {{ param.name }}
-                  <span class="text-gray-500 text-xs ml-2">{{ param.description }}</span>
+                  <span class="text-gray-400 text-xs ml-2">{{ param.description }}</span>
                 </label>
 
                 <!-- String with enum -->
@@ -33,7 +33,7 @@
                   <select 
                     v-model="formData[param.name]"
                     :id="param.name"
-                    class="flex-1 bg-gray-800 rounded-lg p-2"
+                    class="flex-1 bg-gray-900 rounded-lg p-2 border border-gray-700 focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
                   >
                     <option value="">Select from options...</option>
                     <option v-for="option in param.enum" :key="option" :value="option">
@@ -44,7 +44,7 @@
                     type="text"
                     v-model="formData[param.name]"
                     :id="`${param.name}-custom`"
-                    class="flex-1 bg-gray-800 rounded-lg p-2"
+                    class="flex-1 bg-gray-900 rounded-lg p-2 border border-gray-700 focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
                     placeholder="Or type custom value"
                   />
                 </div>
@@ -56,15 +56,14 @@
                           :key="index"
                           class="bg-gray-700 px-2 py-1 rounded-lg flex items-center gap-1">
                       {{ item }}
-                      <button @click="removeArrayItem(param.name, index)" type="button">
+                      <button @click="removeArrayItem(param.name, index)" type="button" class="text-gray-400 hover:text-gray-200">
                         <X class="h-3 w-3" />
                       </button>
                     </span>
                   </div>
                   <div class="flex gap-2">
-                    <!-- Dropdown for enum values -->
                     <select 
-                      class="flex-1 bg-gray-800 rounded-lg p-2"
+                      class="flex-1 bg-gray-900 rounded-lg p-2 border border-gray-700 focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
                       @change="handleEnumSelect(param.name, $event.target.value)"
                     >
                       <option value="">Select from options...</option>
@@ -72,12 +71,11 @@
                         {{ option }}
                       </option>
                     </select>
-                    <!-- Manual input -->
                     <input type="text" 
                            :id="param.name"
                            v-model="arrayInputs[param.name]"
                            @keydown.enter.prevent="addArrayItem(param.name)"
-                           class="flex-1 bg-gray-800 rounded-lg p-2"
+                           class="flex-1 bg-gray-900 rounded-lg p-2 border border-gray-700 focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
                            placeholder="Or type custom value and press Enter" />
                   </div>
                 </div>
@@ -130,12 +128,12 @@
           <div :class="showForm ? 'flex-1' : 'w-full'">
             <textarea
               v-model="promptText"
-              class="w-full h-[calc(100%-40px)] bg-gray-800 rounded-lg p-4 resize-none"
+              class="w-full h-[calc(100%-40px)] bg-[#171717] rounded-lg p-4 resize-none border border-gray-700 focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
               placeholder="Enter your prompt here..."
             ></textarea>
             <button 
               @click="generateParameters"
-              class="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg w-full"
+              class="mt-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg w-full text-gray-100 transition-colors"
             >
               {{ showForm ? 'Update Parameters from Text' : 'Generate Parameters' }}
             </button>
@@ -147,7 +145,7 @@
       <div class="p-4 border-t border-gray-700">
         <button 
           @click="compilePrompt"
-          class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg w-full"
+          class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg w-full text-gray-100 transition-colors"
         >
           Compile Final Prompt
         </button>
