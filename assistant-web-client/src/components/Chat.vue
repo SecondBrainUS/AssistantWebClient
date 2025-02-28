@@ -26,6 +26,12 @@
                 <div class="text-xs text-gray-400">
                   {{ formatTimestamp(message.timestamp) }}
                 </div>
+                <!-- Timer for SBAW function calls -->
+                <div v-if="functionStartTimes.has(message.call_id) && !getFunctionResult(message.call_id)" 
+                     class="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
+                  <Clock class="h-3 w-3" />
+                  <span>{{ formatElapsedTime(functionElapsedTimes.get(message.call_id) || 0) }}</span>
+                </div>
               </div>
             </div>
             <div class="p-3 rounded-lg bg-[#222222]">
@@ -51,6 +57,12 @@
                   <ArrowRight class="h-4 w-4" />
                   <div class="text-xs text-gray-400">
                     {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                  </div>
+                  <!-- Display elapsed time for completed function calls -->
+                  <div v-if="functionElapsedTimes.has(message.call_id)" 
+                       class="text-xs text-green-400 flex items-center gap-1">
+                    <Clock class="h-3 w-3" />
+                    <span> {{ formatElapsedTime(functionElapsedTimes.get(message.call_id)) }}</span>
                   </div>
                 </div>
               </div>
@@ -289,7 +301,8 @@ import {
   AlertCircle,
   XCircle,
   MoreVertical,
-  Wand2
+  Wand2,
+  Clock
 } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
@@ -338,6 +351,11 @@ const emit = defineEmits(['startRecording', 'stopRecording', 'notification'])
 
 const showTokenUsage = ref(null)
 const isProcessing = ref(false);
+
+// Add refs for function call timing
+const functionTimers = ref(new Map()) // Map to store interval IDs for active timers
+const functionStartTimes = ref(new Map()) // Map to store start times for function calls
+const functionElapsedTimes = ref(new Map()) // Map to store elapsed times for completed function calls
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -466,6 +484,7 @@ async function setupSocketHandlers() {
     // If we disconnect, update room status as well
     if (status === 'disconnected') {
       roomStatus.value = 'disconnected'
+      clearAllFunctionTimers() // Clear any active timers on disconnect
     }
     
     // If we reconnect, try to rejoin the room
@@ -520,6 +539,11 @@ async function setupSocketHandlers() {
     if (message) {
       message.error = data.error;
       messageStatuses.value.set(message.id, 'error');
+      
+      // If this is a function call that failed, stop its timer
+      if (message.type === 'function_call' && message.call_id && functionTimers.value.has(message.call_id)) {
+        stopFunctionTimer(message.call_id);
+      }
     }
   });
 }
@@ -652,11 +676,24 @@ function handleSBAWFunctionCall(eventData) {
     arguments: JSON.stringify(data.arguments),
     timestamp: new Date(data.created_timestamp)
   })
+  
+  // Only start timers for SBAW function calls
+  if (eventData.type && eventData.type.includes('sbaw')) {
+    // Start the timer for this function call
+    startFunctionTimer(data.call_id)
+  }
 }
 
 function handleSBAWFunctionResult(eventData) {
   console.log("[CHAT] [HANDLE FUNCTION RESULT]: ", eventData)
   const data = eventData.data
+  
+  // Only stop timers for SBAW function calls
+  if (eventData.type && eventData.type.includes('sbaw')) {
+    // Stop the timer for this function call
+    stopFunctionTimer(data.call_id)
+  }
+  
   messages.value.push({
     id: data.id,
     call_id: data.call_id,
@@ -1021,6 +1058,9 @@ onUnmounted(() => {
     props.socketClient.onRoomError(null)
     props.socketClient.onRoomLeft(null)
   }
+  
+  // Cleanup function timers
+  clearAllFunctionTimers()
 })
 
 // Scroll handling
@@ -1153,6 +1193,68 @@ function handleStopAudio() {
 // Add new function to toggle token usage display
 function toggleTokenUsage(messageId) {
   showTokenUsage.value = showTokenUsage.value === messageId ? null : messageId
+}
+
+// Function to start the timer for a function call
+function startFunctionTimer(callId) {
+  // Store the start time
+  functionStartTimes.value.set(callId, Date.now())
+  
+  // Create an interval to update the elapsed time every second
+  const timerId = setInterval(() => {
+    const startTime = functionStartTimes.value.get(callId)
+    if (startTime) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      functionElapsedTimes.value.set(callId, elapsed)
+    }
+  }, 1000)
+  
+  functionTimers.value.set(callId, timerId)
+}
+
+// Function to stop the timer for a function call
+function stopFunctionTimer(callId) {
+  // Clear the interval
+  if (functionTimers.value.has(callId)) {
+    clearInterval(functionTimers.value.get(callId))
+    functionTimers.value.delete(callId)
+  }
+  
+  // Calculate the final elapsed time
+  const startTime = functionStartTimes.value.get(callId)
+  if (startTime) {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000)
+    functionElapsedTimes.value.set(callId, elapsed)
+    functionStartTimes.value.delete(callId)
+  }
+}
+
+// Helper function to clear all active function timers
+function clearAllFunctionTimers() {
+  functionTimers.value.forEach((timerId, callId) => {
+    clearInterval(timerId)
+    
+    // Calculate final time for any active timers
+    const startTime = functionStartTimes.value.get(callId)
+    if (startTime) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      functionElapsedTimes.value.set(callId, elapsed)
+    }
+  })
+  
+  functionTimers.value.clear()
+  functionStartTimes.value.clear()
+}
+
+// Function to format elapsed time for display
+function formatElapsedTime(seconds) {
+  if (seconds < 60) {
+    return `${seconds}s`
+  } else {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}m ${remainingSeconds}s`
+  }
 }
 
 // New function to handle "stop processing"
