@@ -6,6 +6,8 @@ import SpotifyCreatePlaylistCard from './SpotifyCreatePlaylistCard.vue';
 import SpotifyAddSongsCard from './SpotifyAddSongsCard.vue';
 import TidalPlaylistTracksCard from './TidalPlaylistTracksCard.vue';
 import BrightdataContentCard from './BrightdataContentCard.vue';
+import StockTickerListCard from './StockTickerListCard.vue';
+import StockDataCard from './StockDataCard.vue';
 
 // Registry map of function names to components
 const FunctionRegistry = {
@@ -25,6 +27,10 @@ const FunctionRegistry = {
   
   // Web scraping functions
   'brightdata_get_content': BrightdataContentCard,
+
+  // Finance functions
+  'list_stock_tickers': StockTickerListCard,
+  'finance_get_stock_data': StockDataCard,
 };
 
 /**

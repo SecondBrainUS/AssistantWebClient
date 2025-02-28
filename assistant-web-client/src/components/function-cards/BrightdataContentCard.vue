@@ -8,7 +8,7 @@
       </svg>
       <span>Web Scraping Result</span>
       <!-- Toggle button to switch between views -->
-      <button @click="toggleView" class="ml-auto text-xs px-2 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition-colors">
+      <button @click.stop="toggleView" class="ml-auto text-xs px-2 py-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition-colors">
         {{ isCustomView ? 'View JSON' : 'View Card' }}
       </button>
     </div>
@@ -42,13 +42,48 @@
             <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">
               Content Size: {{ formatBytes(contentData.content_length) }}
             </span>
+            
+            <!-- Download button -->
+            <button 
+              @click.stop="downloadContent" 
+              class="ml-3 p-1 rounded-full text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors" 
+              title="Download Full Content"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
       
+      <!-- Preview toggle if content is large -->
+      <div v-if="isLargeContent && !fullContentLoaded" class="p-4 text-center">
+        <p class="text-gray-500 dark:text-gray-400 mb-3">
+          This content is large ({{ formatBytes(contentData.content_length) }}) and may impact performance.
+        </p>
+        <button 
+          @click.stop="loadFullContent" 
+          class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+        >
+          Load Full Content
+        </button>
+        <button 
+          @click.stop="loadPreviewContent" 
+          class="ml-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+        >
+          Show Preview
+        </button>
+      </div>
+      
+      <!-- Loading indicator -->
+      <div v-else-if="isLoading" class="p-12 flex justify-center items-center">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+      </div>
+      
       <!-- Markdown content -->
-      <div class="p-4 markdown-body max-h-96 overflow-y-auto">
-        <div v-html="renderMarkdown(contentData.markdown)"></div>
+      <div v-else-if="renderedContent" class="p-4 markdown-body max-h-96 overflow-y-auto">
+        <div v-html="renderedContent"></div>
       </div>
     </div>
 
@@ -60,14 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { marked } from 'marked';
-
-// Initialize marked with default options
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
+import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
   functionCall: {
@@ -81,6 +109,13 @@ const props = defineProps({
 });
 
 const isCustomView = ref(true);
+const isLoading = ref(false);
+const renderedContent = ref('');
+const fullContentLoaded = ref(false);
+const markedInstance = ref(null);
+
+// Threshold for "large" content in bytes (e.g., 100KB)
+const LARGE_CONTENT_THRESHOLD = 100 * 1024;
 
 const contentData = computed(() => {
   if (!props.functionResult || !props.functionResult.result) return { 
@@ -89,6 +124,10 @@ const contentData = computed(() => {
     content_length: 0
   };
   return props.functionResult.result;
+});
+
+const isLargeContent = computed(() => {
+  return contentData.value.content_length > LARGE_CONTENT_THRESHOLD;
 });
 
 const functionArgs = computed(() => {
@@ -104,18 +143,69 @@ const sourceUrl = computed(() => {
   return functionArgs.value.url || '';
 });
 
-function toggleView() {
-  isCustomView.value = !isCustomView.value;
+// Import marked dynamically only when needed
+async function loadMarkedLibrary() {
+  if (!markedInstance.value) {
+    isLoading.value = true;
+    try {
+      const { marked } = await import('marked');
+      marked.setOptions({
+        breaks: true,
+        gfm: true,
+      });
+      markedInstance.value = marked;
+    } catch (e) {
+      console.error('Error loading marked library:', e);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+  return markedInstance.value;
 }
 
-function renderMarkdown(markdown) {
+async function renderMarkdown(markdown, force = false) {
   if (!markdown) return '';
+  
   try {
+    const marked = await loadMarkedLibrary();
+    if (!marked) return '<div class="text-red-500">Error loading markdown renderer</div>';
+    
+    // For large content, only render if forced or in preview mode
+    if (isLargeContent.value && !force) {
+      fullContentLoaded.value = false;
+      return ''; // Don't render large content until explicitly requested
+    }
+    
     return marked(markdown);
   } catch (e) {
     console.error('Error rendering markdown:', e);
     return '<div class="text-red-500">Error rendering markdown content</div>';
   }
+}
+
+async function loadFullContent() {
+  isLoading.value = true;
+  setTimeout(async () => {
+    renderedContent.value = await renderMarkdown(contentData.value.markdown, true);
+    fullContentLoaded.value = true;
+    isLoading.value = false;
+  }, 50); // Small delay to allow UI to update
+}
+
+async function loadPreviewContent() {
+  isLoading.value = true;
+  setTimeout(async () => {
+    // Extract first ~2000 characters for preview
+    const previewText = contentData.value.markdown.slice(0, 2000) + 
+      (contentData.value.markdown.length > 2000 ? '\n\n*... Content truncated. Click "Load Full Content" to see everything ...*' : '');
+    renderedContent.value = await renderMarkdown(previewText, true);
+    fullContentLoaded.value = false;
+    isLoading.value = false;
+  }, 50);
+}
+
+function toggleView() {
+  isCustomView.value = !isCustomView.value;
 }
 
 function formatBytes(bytes, decimals = 2) {
@@ -128,6 +218,48 @@ function formatBytes(bytes, decimals = 2) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// Initialize with preview content for smaller content
+onMounted(async () => {
+  if (!isLargeContent.value) {
+    loadFullContent();
+  }
+});
+
+// Reset rendered content when function result changes
+watch(() => props.functionResult, async (newVal) => {
+  if (newVal) {
+    renderedContent.value = '';
+    fullContentLoaded.value = false;
+    if (!isLargeContent.value) {
+      loadFullContent();
+    }
+  }
+}, { deep: true });
+
+// Add download function to the BrightdataContentCard
+function downloadContent() {
+  if (!contentData.value.markdown) return;
+  
+  // Create a blob with the full content
+  const blob = new Blob([contentData.value.markdown], { type: 'text/markdown;charset=utf-8' });
+  
+  // Create a download link
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `scraped_content_${new Date().toISOString().slice(0, 10)}.md`;
+  
+  // Trigger the download
+  document.body.appendChild(a);
+  a.click();
+  
+  // Clean up
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 </script>
 
