@@ -1,6 +1,10 @@
 // Import all custom function components
 import SpotifySearchCard from './SpotifySearchCard.vue';
 import SpotifyPlaylistCard from './SpotifyPlaylistCard.vue';
+import SpotifyUserCard from './SpotifyUserCard.vue';
+import SpotifyCreatePlaylistCard from './SpotifyCreatePlaylistCard.vue';
+import SpotifyAddSongsCard from './SpotifyAddSongsCard.vue';
+import TidalPlaylistTracksCard from './TidalPlaylistTracksCard.vue';
 
 // Registry map of function names to components
 const FunctionRegistry = {
@@ -10,6 +14,13 @@ const FunctionRegistry = {
   'spotify_search_artist': SpotifySearchCard,
   'spotify_get_playlist_by_name': SpotifyPlaylistCard,
   'spotify_get_playlist_by_id': SpotifyPlaylistCard,
+  'spotify_get_current_user': SpotifyUserCard,
+  'spotify_create_playlist': SpotifyCreatePlaylistCard,
+  'spotify_add_song_to_playlist': SpotifyAddSongsCard,
+  'spotify_add_songs_to_playlist': SpotifyAddSongsCard,
+  
+  // Tidal API functions
+  'tidal_get_playlist_tracks': TidalPlaylistTracksCard,
 };
 
 /**
