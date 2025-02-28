@@ -5,6 +5,7 @@ import SpotifyUserCard from './SpotifyUserCard.vue';
 import SpotifyCreatePlaylistCard from './SpotifyCreatePlaylistCard.vue';
 import SpotifyAddSongsCard from './SpotifyAddSongsCard.vue';
 import TidalPlaylistTracksCard from './TidalPlaylistTracksCard.vue';
+import BrightdataContentCard from './BrightdataContentCard.vue';
 
 // Registry map of function names to components
 const FunctionRegistry = {
@@ -21,6 +22,9 @@ const FunctionRegistry = {
   
   // Tidal API functions
   'tidal_get_playlist_tracks': TidalPlaylistTracksCard,
+  
+  // Web scraping functions
+  'brightdata_get_content': BrightdataContentCard,
 };
 
 /**
