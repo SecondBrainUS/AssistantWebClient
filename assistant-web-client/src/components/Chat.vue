@@ -19,70 +19,148 @@
                class="bg-[#171717] rounded-lg p-2 pb-4 px-3 mb-4 clear-both w-fit max-w-[80%] relative"
                @click="toggleTokenUsage(message.id)"
           >
-            <!-- Function call -->
-            <div class="flex justify-between items-center mb-1">
-              <div class="flex items-center gap-2">
-                <Wrench class="h-4 w-4" />
-                <div class="text-xs text-gray-400">
-                  {{ formatTimestamp(message.timestamp) }}
-                </div>
-                <!-- Timer for SBAW function calls -->
-                <div v-if="functionStartTimes.has(message.call_id) && !getFunctionResult(message.call_id)" 
-                     class="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
-                  <Clock class="h-3 w-3" />
-                  <span>{{ formatElapsedTime(functionElapsedTimes.get(message.call_id) || 0) }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="p-3 rounded-lg bg-[#222222]">
-              <div class="font-mono">
-                <span style="color: #dcdc90">{{ message.name }}</span>
-                <span style="color: #f1d700">(</span>
-                <span style="color: #b670d6">
-                  {
-                  <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
-                    <span style="color: #9cdcfe">{{ key }}</span>
-                    <span style="color: #9cdcfe">: </span>
-                    <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
-                  </span>
-                  }
-                </span>
-                <span style="color: #f1d700">)</span>
-              </div>
-            </div>
-            <!-- Function result -->
-            <div v-if="getFunctionResult(message.call_id)" class="mt-2">
+            <!-- Wrap function calls with our FunctionCard component -->
+            <FunctionCard 
+              v-if="hasCustomFunctionComponent(message.name)" 
+              :functionCall="message" 
+              :functionResult="getFunctionResult(message.call_id)"
+              :ref="el => { if (el) functionCardRefs[message.id] = el }"
+            >
+              <!-- Function call -->
               <div class="flex justify-between items-center mb-1">
                 <div class="flex items-center gap-2">
-                  <ArrowRight class="h-4 w-4" />
+                  <Wrench class="h-4 w-4" />
                   <div class="text-xs text-gray-400">
-                    {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                    {{ formatTimestamp(message.timestamp) }}
                   </div>
-                  <!-- Display elapsed time for completed function calls -->
-                  <div v-if="functionElapsedTimes.has(message.call_id)" 
-                       class="text-xs text-green-400 flex items-center gap-1">
+                  <!-- Timer for SBAW function calls -->
+                  <div v-if="functionStartTimes.has(message.call_id) && !getFunctionResult(message.call_id)" 
+                       class="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
                     <Clock class="h-3 w-3" />
-                    <span> {{ formatElapsedTime(functionElapsedTimes.get(message.call_id)) }}</span>
+                    <span>{{ formatElapsedTime(functionElapsedTimes.get(message.call_id) || 0) }}</span>
                   </div>
                 </div>
               </div>
               <div class="p-3 rounded-lg bg-[#222222]">
-                <div class="font-mono break-all whitespace-pre-wrap">
-                  <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
-                    <span style="color: #b670d6">{</span>
-                    <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                <div class="font-mono">
+                  <span style="color: #dcdc90">{{ message.name }}</span>
+                  <span style="color: #f1d700">(</span>
+                  <span style="color: #b670d6">
+                    {
+                    <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
                       <span style="color: #9cdcfe">{{ key }}</span>
                       <span style="color: #9cdcfe">: </span>
-                      <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                      <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
                     </span>
-                    <span style="color: #b670d6">}</span>
-                  </template>
-                  <template v-else>
-                    <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
-                  </template>
+                    }
+                  </span>
+                  <span style="color: #f1d700">)</span>
                 </div>
               </div>
-            </div>
+              
+              <!-- Function result -->
+              <div v-if="getFunctionResult(message.call_id)" class="mt-2">
+                <div class="flex justify-between items-center mb-1">
+                  <div class="flex items-center gap-2">
+                    <ArrowRight class="h-4 w-4" />
+                    <div class="text-xs text-gray-400">
+                      {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                    </div>
+                    <!-- Display elapsed time for completed function calls -->
+                    <div v-if="functionElapsedTimes.has(message.call_id)" 
+                         class="text-xs text-green-400 flex items-center gap-1">
+                      <Clock class="h-3 w-3" />
+                      <span> {{ formatElapsedTime(functionElapsedTimes.get(message.call_id)) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg bg-[#222222]">
+                  <div class="font-mono break-all whitespace-pre-wrap">
+                    <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
+                      <span style="color: #b670d6">{</span>
+                      <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                        <span style="color: #9cdcfe">{{ key }}</span>
+                        <span style="color: #9cdcfe">: </span>
+                        <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                      </span>
+                      <span style="color: #b670d6">}</span>
+                    </template>
+                    <template v-else>
+                      <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </FunctionCard>
+            
+            <!-- Original function call display for non-custom functions -->
+            <template v-else>
+              <!-- Function call -->
+              <div class="flex justify-between items-center mb-1">
+                <div class="flex items-center gap-2">
+                  <Wrench class="h-4 w-4" />
+                  <div class="text-xs text-gray-400">
+                    {{ formatTimestamp(message.timestamp) }}
+                  </div>
+                  <!-- Timer for SBAW function calls -->
+                  <div v-if="functionStartTimes.has(message.call_id) && !getFunctionResult(message.call_id)" 
+                       class="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
+                    <Clock class="h-3 w-3" />
+                    <span>{{ formatElapsedTime(functionElapsedTimes.get(message.call_id) || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="p-3 rounded-lg bg-[#222222]">
+                <div class="font-mono">
+                  <span style="color: #dcdc90">{{ message.name }}</span>
+                  <span style="color: #f1d700">(</span>
+                  <span style="color: #b670d6">
+                    {
+                    <span v-for="(value, key) in JSON.parse(message.arguments)" :key="key">
+                      <span style="color: #9cdcfe">{{ key }}</span>
+                      <span style="color: #9cdcfe">: </span>
+                      <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(JSON.parse(message.arguments), key) ? '' : ',' }}
+                    </span>
+                    }
+                  </span>
+                  <span style="color: #f1d700">)</span>
+                </div>
+              </div>
+              
+              <!-- Function result -->
+              <div v-if="getFunctionResult(message.call_id)" class="mt-2">
+                <div class="flex justify-between items-center mb-1">
+                  <div class="flex items-center gap-2">
+                    <ArrowRight class="h-4 w-4" />
+                    <div class="text-xs text-gray-400">
+                      {{ formatTimestamp(getFunctionResult(message.call_id).timestamp) }}
+                    </div>
+                    <!-- Display elapsed time for completed function calls -->
+                    <div v-if="functionElapsedTimes.has(message.call_id)" 
+                         class="text-xs text-green-400 flex items-center gap-1">
+                      <Clock class="h-3 w-3" />
+                      <span> {{ formatElapsedTime(functionElapsedTimes.get(message.call_id)) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="p-3 rounded-lg bg-[#222222]">
+                  <div class="font-mono break-all whitespace-pre-wrap">
+                    <template v-if="typeof getFunctionResult(message.call_id).result === 'object' && getFunctionResult(message.call_id).result !== null">
+                      <span style="color: #b670d6">{</span>
+                      <span v-for="(value, key) in getFunctionResult(message.call_id).result" :key="key">
+                        <span style="color: #9cdcfe">{{ key }}</span>
+                        <span style="color: #9cdcfe">: </span>
+                        <span style="color: #ce916a">{{ formatResultValue(value) }}</span>{{ isLastKey(getFunctionResult(message.call_id).result, key) ? '' : ',' }}
+                      </span>
+                      <span style="color: #b670d6">}</span>
+                    </template>
+                    <template v-else>
+                      <span style="color: #ce916a">{{ formatResultValue(getFunctionResult(message.call_id).result) }}</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
 
             <!-- Token Usage Display -->
             <Transition
@@ -309,6 +387,8 @@ import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
 import audioHandler from '../utils/audioHandler';
 import ToolsMenu from './ToolsMenu.vue'
+import FunctionCard from './function-cards/FunctionCard.vue'
+import { hasCustomComponent } from './function-cards/FunctionComponentRegistry'
 
 const props = defineProps({
   chatid: {
@@ -356,6 +436,7 @@ const isProcessing = ref(false);
 const functionTimers = ref(new Map()) // Map to store interval IDs for active timers
 const functionStartTimes = ref(new Map()) // Map to store start times for function calls
 const functionElapsedTimes = ref(new Map()) // Map to store elapsed times for completed function calls
+const functionCardRefs = ref({}) // Map to store references to function card components
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -1190,9 +1271,22 @@ function handleStopAudio() {
   isPlayingAudio.value = false
 }
 
-// Add new function to toggle token usage display
+// Update the toggleTokenUsage function
 function toggleTokenUsage(messageId) {
-  showTokenUsage.value = showTokenUsage.value === messageId ? null : messageId
+  // Find the message by its ID
+  const message = messages.value.find(m => m.id === messageId);
+  
+  // If it's a function call with a custom component, toggle the view
+  if (message && message.type === 'function_call' && hasCustomFunctionComponent(message.name)) {
+    // Find the card reference by message ID
+    const cardRef = functionCardRefs.value[messageId];
+    if (cardRef && cardRef.hasCustomView) {
+      cardRef.toggleView();
+    }
+  }
+  
+  // Toggle token usage display
+  showTokenUsage.value = showTokenUsage.value === messageId ? null : messageId;
 }
 
 // Function to start the timer for a function call
@@ -1279,6 +1373,10 @@ async function handleStopProcessing() {
 function handlePromptCompiler() {
   // Add your prompt compiler logic here
   console.log('Prompt Compiler clicked')
+}
+
+function hasCustomFunctionComponent(name) {
+  return hasCustomComponent(name);
 }
 </script>
 
