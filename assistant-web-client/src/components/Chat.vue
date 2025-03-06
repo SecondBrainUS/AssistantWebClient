@@ -230,6 +230,12 @@
                     Transcribing...
                   </span>
                 </div>
+                <!-- Add file attachment indicator -->
+                <div v-if="message.hasAttachments" 
+                     class="text-xs text-gray-400 flex items-center gap-1">
+                  <Paperclip class="h-4 w-4" />
+                  <span>{{ message.attachmentCount }} {{ message.attachmentCount === 1 ? 'file' : 'files' }}</span>
+                </div>
               </div>
             </div>
             <div :class="[
@@ -240,6 +246,38 @@
             ]"
             @click="message.usage && toggleTokenUsage(message.id)"
             >
+              <!-- File attachments preview (for user messages) -->
+              <div v-if="message.role === 'user' && messageAttachments.has(message.id)" class="mb-3 flex flex-wrap gap-2">
+                <div 
+                  v-for="file in messageAttachments.get(message.id)" 
+                  :key="file.fileId"
+                  class="flex items-center gap-1 bg-gray-700 px-2 py-1 rounded-md text-xs"
+                >
+                  <!-- File type icon -->
+                  <img v-if="file.fileType && file.fileType.startsWith('image/')" 
+                       :src="`/chat/${props.chatid}/files/${file.fileId}`" 
+                       alt="attachment" 
+                       class="w-5 h-5 object-cover rounded" />
+                  <FileIcon v-else-if="file.fileType === 'application/pdf'" class="h-4 w-4 text-red-400" />
+                  <FileSpreadsheet v-else-if="file.fileType === 'application/vnd.ms-excel' || file.fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'" class="h-4 w-4 text-green-400" />
+                  <FileText v-else-if="file.fileType === 'text/plain'" class="h-4 w-4 text-blue-400" />
+                  <File v-else class="h-4 w-4 text-gray-400" />
+                  
+                  <!-- File name -->
+                  <span class="truncate max-w-[100px]">{{ file.fileName }}</span>
+                  
+                  <!-- View/download button -->
+                  <a 
+                    :href="`/chat/${props.chatid}/files/${file.fileId}`" 
+                    target="_blank" 
+                    class="hover:text-blue-400 transition-colors ml-1"
+                    @click.stop
+                  >
+                    <ExternalLink class="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+              
               <div v-if="message.awaitingTranscription" class="text-gray-400 italic">
                 Audio message - awaiting transcription...
               </div>
@@ -343,12 +381,15 @@
           <div class="flex-grow">
             <ChatInput 
               :initial-text="pendingMessage"
+              :chat-id="props.chatid"
               :start-recording-on-mount="startRecording"
               :is-processing="isProcessing"
               @send="handleSend"
               @startRecording="handleStartRecording"
               @stopRecording="handleStopRecording"
               @stopProcessing="handleStopProcessing"
+              @fileAttached="handleFileAttached"
+              @fileRemoved="handleFileRemoved"
               class="w-full"
             />
           </div>
@@ -380,7 +421,13 @@ import {
   XCircle,
   MoreVertical,
   Wand2,
-  Clock
+  Clock,
+  Paperclip,
+  FileIcon,
+  FileSpreadsheet,
+  FileText,
+  ExternalLink,
+  File
 } from 'lucide-vue-next'
 import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
@@ -437,6 +484,9 @@ const functionTimers = ref(new Map()) // Map to store interval IDs for active ti
 const functionStartTimes = ref(new Map()) // Map to store start times for function calls
 const functionElapsedTimes = ref(new Map()) // Map to store elapsed times for completed function calls
 const functionCardRefs = ref({}) // Map to store references to function card components
+
+const messageAttachments = ref(new Map()) // Map of message ID to array of file attachments
+const pendingAttachments = ref([]) // Temporary storage for attachments before message is sent
 
 // Initialize socket status based on current connection state
 socketStatus.value = props.socketClient.isConnected ? 'connected' : 'disconnected'
@@ -790,6 +840,8 @@ function handleSBAWTextMessageUser(eventData) {
   console.log("[CHAT] [HANDLE SBAW TEXT MEESAGE USER] Event data:", eventData)
   const data = eventData.data
   const source = !messageStatuses.value.has(data.id) ? 'other-session' : null
+  const fileIds = data.files || []
+  
   messages.value.push({
     id: data.id,
     role: data.role,
@@ -797,7 +849,9 @@ function handleSBAWTextMessageUser(eventData) {
     model_id: data.model_id,
     modality: data.modality,
     timestamp: new Date(data.created_timestamp),
-    source: source
+    source: source,
+    hasAttachments: fileIds.length > 0,
+    attachmentCount: fileIds.length
   });
 }
 
@@ -935,6 +989,7 @@ function handleUserMessage(eventData) {
   // Extract the message content
   const messageContent = eventData.message.data.item.content[0].text
   const messageId = eventData.message.data.item.id
+  const fileIds = eventData.message.data.item.files || []
 
   // If this message isn't in our messageStatuses, it came from another session
   const source = !messageStatuses.value.has(messageId) ? 'other-session' : null
@@ -944,13 +999,15 @@ function handleUserMessage(eventData) {
     role: 'user',
     content: messageContent,
     timestamp: new Date(),
-    source
+    source,
+    hasAttachments: fileIds.length > 0,
+    attachmentCount: fileIds.length
   }
 
   messages.value.push(message)
 }
 
-async function handleSend(message) {
+async function handleSend(message, fileIds = []) {
   if (socketStatus.value !== 'connected' || roomStatus.value !== 'connected') {
     console.error('Socket or room not connected')
     emit('notification', {
@@ -961,12 +1018,31 @@ async function handleSend(message) {
     return
   }
 
+  // Generate a local message ID
+  const localMessageId = Date.now().toString()
+  
+  // Store attachments with this message
+  if (pendingAttachments.value.length > 0) {
+    // Only include attachments that match the fileIds
+    const relevantAttachments = pendingAttachments.value.filter(
+      attachment => fileIds.includes(attachment.fileId)
+    )
+    
+    if (relevantAttachments.length > 0) {
+      messageAttachments.value.set(localMessageId, relevantAttachments)
+      
+      // Clear the pending attachments that were assigned to this message
+      pendingAttachments.value = pendingAttachments.value.filter(
+        attachment => !fileIds.includes(attachment.fileId)
+      )
+    }
+  }
+
   if (selectedModel.value.model_api_source == "aisuite") {
-    handleSendSBAW(message);
+    handleSendSBAW(message, localMessageId, fileIds);
     return;
   }
 
-  const localMessageId = Date.now().toString()
   try {
     messageStatuses.value.set(localMessageId, 'sending')
     
@@ -974,7 +1050,9 @@ async function handleSend(message) {
       id: localMessageId,
       role: 'user',
       content: message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      hasAttachments: fileIds.length > 0,
+      attachmentCount: fileIds.length
     })
 
     const item = {
@@ -1012,9 +1090,8 @@ async function handleSend(message) {
   }
 }
 
-async function handleSendSBAW(message) {
+async function handleSendSBAW(message, localMessageId, fileIds = []) {
   console.log(message);
-  const localMessageId = Date.now().toString()
   messageStatuses.value.set(localMessageId, 'sending')
   messages.value.push({
     id: localMessageId,
@@ -1023,15 +1100,19 @@ async function handleSendSBAW(message) {
     content: message,
     model_id: selectedModel.value.model_id,
     modality: 'text',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    hasAttachments: fileIds.length > 0,
+    attachmentCount: fileIds.length
   });
+  
   const item = {
     id: localMessageId,
     type: 'message',
     role: 'user',
     model_id: selectedModel.value.model_id,
     modality: 'text',
-    content: message
+    content: message,
+    files: fileIds.length > 0 ? fileIds : undefined
   }
 
   const messageData = {
@@ -1039,6 +1120,7 @@ async function handleSendSBAW(message) {
     data: { item },
     id: localMessageId,
   }
+  
   try {
     const sendResult = await props.socketClient.sendMessage(roomid.value, messageData, selectedModel.value.model_id)
     console.log("[CHAT] [HANDLE SEND SBAW] Send result:", sendResult)
@@ -1377,6 +1459,48 @@ function handlePromptCompiler() {
 
 function hasCustomFunctionComponent(name) {
   return hasCustomComponent(name);
+}
+
+// Handle file attachments 
+function handleFileAttached(fileData) {
+  console.log('File attached:', fileData)
+  pendingAttachments.value.push(fileData)
+}
+
+function handleFileRemoved(fileId) {
+  console.log('File removed:', fileId)
+  // Remove from pending attachments
+  const index = pendingAttachments.value.findIndex(file => file.fileId === fileId)
+  if (index !== -1) {
+    pendingAttachments.value.splice(index, 1)
+  }
+  
+  // Also remove from any message that might have it
+  for (const [messageId, attachments] of messageAttachments.value.entries()) {
+    const messageAttachmentIndex = attachments.findIndex(file => file.fileId === fileId)
+    if (messageAttachmentIndex !== -1) {
+      const updatedAttachments = [...attachments]
+      updatedAttachments.splice(messageAttachmentIndex, 1)
+      
+      if (updatedAttachments.length === 0) {
+        // If no attachments left, remove the entry completely
+        messageAttachments.value.delete(messageId)
+      } else {
+        // Otherwise update with remaining attachments
+        messageAttachments.value.set(messageId, updatedAttachments)
+      }
+      
+      // Update the message if needed to show it has attachments
+      const messageIndex = messages.value.findIndex(m => m.id === messageId)
+      if (messageIndex !== -1) {
+        messages.value[messageIndex] = {
+          ...messages.value[messageIndex],
+          hasAttachments: updatedAttachments.length > 0,
+          attachmentCount: updatedAttachments.length
+        }
+      }
+    }
+  }
 }
 </script>
 
