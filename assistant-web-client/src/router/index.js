@@ -22,6 +22,13 @@ const router = createRouter({
       component: () => import('@/pages/LoginCallback.vue'),
       meta: { requiresTemp: true }
     }
+    ,
+    {
+      path: '/cloud',
+      name: 'cloud',
+      component: () => import('@/components/CloudBackground.vue'),
+      meta: {}
+    }
   ]
 })
 
