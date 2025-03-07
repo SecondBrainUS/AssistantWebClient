@@ -96,10 +96,13 @@
       <!-- Send/Stop Button -->
       <button 
         @click="isProcessing ? handleStopProcessing() : handleSend()" 
-        class="p-2 rounded-lg flex items-center justify-center hover:bg-gray-700 text-white"
+        class="p-2 rounded-lg flex items-center justify-center text-white"
+        :class="{'hover:bg-gray-700': !isUploading, 'opacity-50 cursor-not-allowed': isUploading && !isProcessing}"
+        :disabled="isUploading && !isProcessing"
+        :title="isUploading ? 'Please wait for files to finish uploading' : ''"
       >
         <XCircle v-if="isProcessing" class="h-6 w-6 text-red-500" />
-        <Send v-else class="h-6 w-6" />
+        <Send v-else class="h-6 w-6" :class="{'text-gray-400': isUploading}" />
       </button>
       
       <!-- Record Button -->
@@ -119,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { 
   Send, 
   Mic, 
@@ -179,6 +182,11 @@ const attachedFiles = ref([])
 const isDragging = ref(false)
 const dragCounter = ref(0)
 
+// Add a computed property to check if any files are uploading
+const isUploading = computed(() => {
+  return attachedFiles.value.some(file => file.status === 'uploading')
+})
+
 // TODO: should remove, no prop mutations
 watch(() => props.initialText, (newVal) => {
   messageText.value = newVal
@@ -229,6 +237,7 @@ function adjustTextareaHeight() {
 
 function handleSend() {
   if (!messageText.value.trim() && attachedFiles.value.length === 0) return
+  if (isUploading.value) return // Prevent sending if files are still uploading
   
   // Get IDs of successfully uploaded files
   const fileIds = attachedFiles.value
