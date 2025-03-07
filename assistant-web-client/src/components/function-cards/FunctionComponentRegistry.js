@@ -8,6 +8,7 @@ import TidalPlaylistTracksCard from './TidalPlaylistTracksCard.vue';
 import BrightdataContentCard from './BrightdataContentCard.vue';
 import StockTickerListCard from './StockTickerListCard.vue';
 import StockDataCard from './StockDataCard.vue';
+import SensorMetricCard from './SensorMetricCard.vue';
 
 // Registry map of function names to components
 const FunctionRegistry = {
@@ -31,6 +32,9 @@ const FunctionRegistry = {
   // Finance functions
   'list_stock_tickers': StockTickerListCard,
   'finance_get_stock_data': StockDataCard,
+  
+  // Sensor functions
+  'sensor_get_location_metric_by_range': SensorMetricCard,
 };
 
 /**
