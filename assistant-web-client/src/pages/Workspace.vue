@@ -2,18 +2,34 @@
   <div class="h-full bg-gray-700 text-gray-100 flex">
     <!-- Notifications -->
     <div class="fixed top-4 right-4 z-50 space-y-2">
-      <div
-        v-for="notification in notifications"
-        :key="notification.id"
-        class="p-4 rounded shadow-lg transition-all duration-300 transform"
-        :class="{
-          'bg-red-500': notification.type === 'error',
-          'bg-green-500': notification.type === 'success',
-          'bg-blue-500': notification.type === 'info'
-        }"
-      >
-        {{ notification.message }}
-      </div>
+      <transition-group name="notification">
+        <div
+          v-for="notification in notifications"
+          :key="notification.id"
+          class="p-3 rounded-lg shadow-lg flex items-center transition-all duration-300 transform max-w-md"
+          :class="{
+            'bg-red-500': notification.type === 'error',
+            'bg-green-500': notification.type === 'success',
+            'bg-blue-500': notification.type === 'info'
+          }"
+        >
+          <!-- Icon based on notification type -->
+          <div class="mr-3">
+            <AlertCircle v-if="notification.type === 'error'" class="h-5 w-5" />
+            <CheckCircle v-else-if="notification.type === 'success'" class="h-5 w-5" />
+            <Info v-else class="h-5 w-5" />
+          </div>
+          <!-- Message -->
+          <div class="flex-1">{{ notification.message }}</div>
+          <!-- Close button -->
+          <button 
+            @click="dismissNotification(notification.id)" 
+            class="ml-2 text-white opacity-70 hover:opacity-100 transition-opacity"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+      </transition-group>
     </div>
 
     <!-- Sidebar -->
@@ -142,7 +158,8 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect, watch } from 'vue'
 import { 
   Menu, Search, PenSquare, MessageSquare,
-  Send, Image, PenLine, HelpCircle, FileText, Mic, Square, Trash2, TrashIcon
+  Send, Image, PenLine, HelpCircle, FileText, Mic, Square, Trash2, TrashIcon,
+  AlertCircle, CheckCircle, Info, X
 } from 'lucide-vue-next'
 import SocketClient from '../utils/socketClient'
 import { useUserStore } from '../store/userStore'
@@ -419,44 +436,70 @@ async function confirmDeleteChat(chatId) {
         selectedChatId.value = null
       }
       
-      // Show success notification
-      notifications.value.push({
+      // Create a properly formatted notification object
+      handleNotification({
         type: 'success',
         message: 'Chat deleted successfully',
-        id: Date.now()
+        // No need to specify ID, handleNotification will create one
       })
+      
     } catch (error) {
       console.error('Error deleting chat:', error)
-      notifications.value.push({
+      handleNotification({
         type: 'error',
         message: 'Failed to delete chat',
-        id: Date.now()
+        // No need to specify ID, handleNotification will create one
       })
     }
   }
 }
 
+function dismissNotification(id) {
+  // Add console log to help debug notification dismissal
+  console.log('Dismissing notification with ID:', id)
+  notifications.value = notifications.value.filter(n => n.id !== id)
+}
+
 function handleNotification(notification) {
-  // Default durations based on notification type
-  const durations = {
-    error: 8000,
-    success: 3000,
-    info: 5000
+  // Generate a truly unique ID
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+  
+  // Ensure each notification has a unique ID
+  const notificationWithId = {
+    ...notification,
+    id: notification.id || uniqueId
   }
   
-  // Use the notification's custom duration if provided, otherwise use the default for its type
-  const duration = notification.duration || durations[notification.type] || 5000
+  // Set a consistent 4 second duration for all notifications
+  const duration = notification.duration || 4000
   
-  notifications.value.push(notification)
+  // Add the notification to the array
+  notifications.value.push(notificationWithId)
+  console.log('Added notification with ID:', notificationWithId.id, 'Will dismiss in', duration, 'ms')
   
   // Create unique timeout for this notification
   setTimeout(() => {
-    notifications.value = notifications.value.filter(n => n.id !== notification.id)
+    console.log('Timeout triggered for notification ID:', notificationWithId.id)
+    dismissNotification(notificationWithId.id)
   }, duration)
 }
 </script>
 
 <style>
+/* Notification animations */
+.notification-enter-active,
+.notification-leave-active {
+  transition: all 0.3s ease;
+}
+.notification-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.notification-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
