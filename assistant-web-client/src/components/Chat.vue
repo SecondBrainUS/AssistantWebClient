@@ -588,14 +588,46 @@ async function loadChatMessages() {
         total_tokens: msg.usage.total_tokens
       } : null;
 
-      return {
+      // Check for file attachments
+      const fileIds = msg.files || [];
+      
+      // Create processed message object
+      const processedMsg = {
         ...msg,
         id: msg.message_id,
         timestamp: msg.created_timestamp,
-        usage: transformedUsage
+        usage: transformedUsage,
+        hasAttachments: fileIds.length > 0,
+        attachmentCount: fileIds.length
+      };
+      
+      // If the message has file attachments and file_contents data is available
+      if (fileIds.length > 0 && msg.file_contents) {
+        // Add file attachments to the messageAttachments map
+        const fileAttachments = [];
+        
+        for (const fileId of fileIds) {
+          if (msg.file_contents[fileId]) {
+            const fileData = msg.file_contents[fileId];
+            fileAttachments.push({
+              fileId: fileId,
+              fileName: fileData.filename,
+              fileType: fileData.content_type,
+              // We don't need to include the full text content here as it's only for display
+            });
+          }
+        }
+        
+        if (fileAttachments.length > 0) {
+          messageAttachments.value.set(processedMsg.id, fileAttachments);
+        }
       }
-    })
-    console.log("Loaded chat messages:", JSON.stringify(messages.value, null, 2))
+      
+      return processedMsg;
+    });
+    
+    console.log("Loaded chat messages:", JSON.stringify(messages.value, null, 2));
+    console.log("Loaded file attachments:", messageAttachments.value);
   } catch (error) {
     console.error('Error loading chat messages:', error)
     emit('notification', {
@@ -1305,7 +1337,7 @@ async function handleStopRecording() {
     
     await props.socketClient.sendMessage(roomid.value, {
       type: 'input_audio_buffer.commit',
-      event_id: `event_${Date.now()}`
+      event_id: `event_${Date.now()}`,
     });
 
     await props.socketClient.sendMessage(roomid.value, {
