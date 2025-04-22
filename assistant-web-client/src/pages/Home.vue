@@ -28,7 +28,7 @@ const userStore = useUserStore()
 const isAuthenticated = computed(() => userStore.isAuthenticated)
 
 const loginWithGoogle = () => {
-  window.location = `${import.meta.env.VITE_API_URL}/api/v1/auth/google/login`
+  window.location = `${import.meta.env.VITE_API_URL}/assistant/api/v1/auth/google/login`
 }
 </script>
 

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useUserStore } from '../store/userStore';
 
 const baseApi = axios.create({
-    baseURL: '/api/v1',
+    baseURL: '/assistant/api/v1',
     withCredentials: true,
 });
 
@@ -16,7 +16,7 @@ baseApi.interceptors.response.use(
             
             try {
                 // Try to refresh the token
-                await fetch('/api/v1/auth/refresh', {
+                await fetch('/assistant/api/v1/auth/refresh', {
                     method: 'POST',
                     credentials: 'include',
                 });

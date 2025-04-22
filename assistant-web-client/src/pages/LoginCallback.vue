@@ -17,7 +17,7 @@ onMounted(async () => {
 
     // Now make a second request to actually set the cookies
     const response = await fetch(
-      `/api/v1/auth/validate-token?temp_token=${tempToken}`,
+      `/assistant/api/v1/auth/validate-token?temp_token=${tempToken}`,
       {
         credentials: 'include'
       }

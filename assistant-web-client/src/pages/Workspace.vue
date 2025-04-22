@@ -242,12 +242,13 @@ async function initializeWebSocket() {
 
   try {
     socketClient.value = new SocketClient(import.meta.env.VITE_API_URL, {
-      auth: { user_id: 'testtest' },
       namespace: '/assistant/realtime',
+      path: '/assistant/socket.io/',
+      auth: { user_id: 'testtest' },
       autoConnect: false,
       timeout: 10000,
       withCredentials: true,
-    })
+  });
 
     await socketClient.value.connect()
 

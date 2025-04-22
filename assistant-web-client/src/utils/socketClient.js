@@ -46,7 +46,7 @@ class SocketClient {
           reconnectionDelay: 1000,
           transports: ['websocket', 'polling'],
           upgrade: true,
-          path: '/socket.io/',
+          path: '/assistant/socket.io/',
           forceNew: true,
           multiplex: false,
         });
