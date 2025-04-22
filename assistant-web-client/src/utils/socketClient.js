@@ -46,10 +46,13 @@ class SocketClient {
           reconnectionDelay: 1000,
           transports: ['websocket', 'polling'],
           upgrade: true,
-          path: '/assistant/socket.io/',
+          path: `/assistant/socket.io/`,
           forceNew: true,
           multiplex: false,
         });
+        // TODO: FIX HARDCODED ASSISTANT HERE
+        // path: `${import.meta.env.VITE_BASE_PATH}/socket.io/`,
+        // causes some injection re-render which says "already trying to connect"
 
         this.socket.connect();
 

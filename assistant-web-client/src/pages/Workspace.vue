@@ -243,7 +243,7 @@ async function initializeWebSocket() {
   try {
     socketClient.value = new SocketClient(import.meta.env.VITE_API_URL, {
       namespace: '/assistant/realtime',
-      path: '/assistant/socket.io/',
+      path: `${import.meta.env.VITE_BASE_PATH}/socket.io/`,
       auth: { user_id: 'testtest' },
       autoConnect: false,
       timeout: 10000,

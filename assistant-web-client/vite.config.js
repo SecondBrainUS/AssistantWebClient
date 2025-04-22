@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/assistant/',
+  base: env.VITE_BASE_PATH,
   resolve: {
     alias: {
       '@': '/src',
