@@ -1,0 +1,39 @@
+import axios, { type AxiosInstance } from 'axios';
+
+const apiClient: AxiosInstance = axios.create({
+	baseURL: `${import.meta.env.VITE_BASE_PATH}/${import.meta.env.VITE_API_PATH}`,
+	timeout: 10000,
+});
+
+const refreshClient: AxiosInstance = axios.create({
+	baseURL: `${import.meta.env.VITE_BASE_PATH}/${import.meta.env.VITE_API_PATH}`,
+	timeout: 10000,
+});
+
+apiClient.interceptors.response.use(
+	(response) => response,
+	async (error) => {
+		const originalRequest = error.config;
+
+		if ((error.response.status === 401 || error.response.status === 403) && !originalRequest._retry) {
+            originalRequest._retry = true;
+            
+            try {
+                // Try to refresh the token
+				await refreshClient.post('/auth/refresh', null, {
+					withCredentials: true,
+				});
+                // Retry the original request
+				return apiClient(originalRequest);
+            } catch (refreshError) {
+                // TODO: If refresh fails, logout the user
+                // const userStore = useUserStore();
+                // await userStore.logout();
+                return Promise.reject(refreshError);
+            }
+        }
+        
+        return Promise.reject(error);
+	}
+)
+export default apiClient;
