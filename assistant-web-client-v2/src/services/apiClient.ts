@@ -1,12 +1,13 @@
 import axios, { type AxiosInstance } from 'axios';
+import { API_URL } from '../config';
 
 const apiClient: AxiosInstance = axios.create({
-	baseURL: `${import.meta.env.VITE_BASE_PATH}/${import.meta.env.VITE_API_PATH}`,
+	baseURL: API_URL,
 	timeout: 10000,
 });
 
 const refreshClient: AxiosInstance = axios.create({
-	baseURL: `${import.meta.env.VITE_BASE_PATH}/${import.meta.env.VITE_API_PATH}`,
+	baseURL: API_URL,
 	timeout: 10000,
 });
 

@@ -7,7 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router basename="/assistant">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login-success" element={<LoginCallback />} />
