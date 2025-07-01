@@ -9,7 +9,7 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/home" element={<LoginCallback />} />
+          <Route path="/" element={<Home />} />
           <Route path="/login-success" element={<LoginCallback />} />
           <Route path="/workspace" element={<Workspace />} />
         </Routes>

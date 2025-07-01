@@ -1,6 +1,8 @@
+import { AUTH_ENDPOINTS } from '../config';
+
 const Login = () => {
 	const handleLogin = () => {
-	  window.location.href = `${import.meta.env.VITE_BASE_PATH}${import.meta.env.VITE_API_PATH}/auth/google/login`;
+	  window.location.href = AUTH_ENDPOINTS.loginRedirect;
 	};
   
 	return (

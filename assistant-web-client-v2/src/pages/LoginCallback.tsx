@@ -18,7 +18,7 @@ const LoginCallback = () => {
       }
 
       try {
-		const validateResponse = await apiClient.get(`/auth/validate-token?temp_token=${tempToken}`);
+		    const validateResponse = await apiClient.get(`/auth/validate-token?temp_token=${tempToken}`);
 
         if (validateResponse.status != 200) {
           throw new Error('Token validation failed');
@@ -26,8 +26,7 @@ const LoginCallback = () => {
 
         const { data: user } = await apiClient.get('/auth/me');
 
-        login(user, '');
-
+        login(user);
         navigate('/workspace');
       } catch (error) {
         console.error('Login callback error:', error);
