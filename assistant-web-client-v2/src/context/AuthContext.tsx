@@ -1,37 +1,54 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { getCurrentUser, logout as logoutApi } from '../services/authService';
+import { getCurrentUser, logout as logoutApi, clearUserCache } from '../services/authService';
 import { type User } from '../types/user';
 
 interface AuthContextType {
 	user: User | null;
+	loading: boolean;
 	login: (user: User | null) => void;
 	logout: () => void;
+	refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: {children: ReactNode }) => {
 	const [user, setUser] = useState<User | null>(null);
+	const [loading, setLoading] = useState(true);
+
+	const loadUser = async (forceRefresh: boolean = false) => {
+		try {
+			setLoading(true);
+			const userData = await getCurrentUser(forceRefresh);
+			setUser(userData);
+		} catch (err) {
+			console.warn('Failed to load user:', err);
+			setUser(null);
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	useEffect(() => {
-		getCurrentUser()
-		.then(setUser)
-		.catch(() => {
-		  setUser(null);
-		});
+		loadUser();
 	}, []);
 
 	const logout = async () => {
 		try {
-		  await logoutApi();
+			await logoutApi();
 		} catch (err) {
-		  console.error('Logout failed:', err);
+			console.error('Logout failed:', err);
 		}
+		clearUserCache();
 		setUser(null);
 	};
 
+	const refreshUser = async () => {
+		await loadUser(true); // Force refresh from API
+	};
+
 	return (
-		<AuthContext.Provider value={{ user, login: setUser, logout }}>
+		<AuthContext.Provider value={{ user, loading, login: setUser, logout, refreshUser }}>
 		  {children}
 		</AuthContext.Provider>
 	);
