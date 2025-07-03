@@ -6,11 +6,11 @@ const Login = () => {
 	};
   
 	return (
-	  <div>
-		<h2>Login</h2>
-		<button onClick={handleLogin}>Login with Google</button>
-	  </div>
-	);
-  };
+      <div>
+        <h2>Login</h2>
+        <button onClick={handleLogin}>Login with Google</button>
+      </div>
+  );
+};
   
-  export default Login;
+export default Login;
