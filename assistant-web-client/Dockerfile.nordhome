@@ -11,8 +11,5 @@ RUN npm install
 # Copy all source code and configuration files
 COPY . .
 
-# Expose the development server port
-EXPOSE 3000
-
 # Start the development server
 CMD ["npm", "run", "dev"] 
