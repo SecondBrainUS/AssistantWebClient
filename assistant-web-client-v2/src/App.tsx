@@ -4,12 +4,11 @@ import LoginCallback from './pages/LoginCallback';
 import Workspace from './pages/Workspace';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
-
 function App() {
   return (
     <div className="flex flex-col h-screen">
     <AuthProvider>
-      <Router basename="/assistant">
+      <Router basename={import.meta.env.BASE_URL}>
       <Navbar/>
         <div className="flex-1 overflow-auto">
           <Routes>
