@@ -10,7 +10,7 @@ const Navbar: React.FC = () => {
   return (
     <nav className="sticky top-0 z-50 flex justify-between items-center p-2 bg-gray-800 text-white">
         <div className="flex items-center">
-        <img src="../assets/mush-v2-logo.png" alt="Logo" className="h-7 mr-3 ml-2" />
+        <img src="./mush-v2-logo.png" alt="Logo" className="h-7 mr-3 ml-2" />
         <h1 className="text-lg">Second Brain</h1>
         <FontAwesomeIcon icon={faUser} />
         </div>

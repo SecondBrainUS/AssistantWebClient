@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
 
   const VITE_BASE_PATH = fileEnv.VITE_BASE_PATH ?? process.env.VITE_BASE_PATH;
   const VITE_PORT      = fileEnv.VITE_FRONTEND_CLIENT_PORT ?? process.env.VITE_FRONTEND_CLIENT_PORT;
+  console.log('VITE_BASE_PATH', VITE_BASE_PATH);
   console.log('VITE_PORT ', VITE_PORT);
   return {
     plugins: [react(), tailwindcss()],
