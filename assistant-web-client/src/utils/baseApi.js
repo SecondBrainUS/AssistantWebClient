@@ -1,8 +1,11 @@
 import axios from 'axios';
 import { useUserStore } from '../store/userStore';
 
+const API_BASE_PATH = import.meta.env.VITE_BASE_PATH || '';
+const API_PATH = import.meta.env.VITE_API_PATH || '/api/v1';
+
 const baseApi = axios.create({
-    baseURL: '/assistant/api/v1',
+    baseURL: `${API_BASE_PATH}${API_PATH}`,
     withCredentials: true,
 });
 
@@ -16,7 +19,7 @@ baseApi.interceptors.response.use(
             
             try {
                 // Try to refresh the token
-                await fetch('/assistant/api/v1/auth/refresh', {
+                await fetch(`${API_BASE_PATH}${API_PATH}/auth/refresh`, {
                     method: 'POST',
                     credentials: 'include',
                 });

@@ -38,6 +38,7 @@ class SocketClient {
       this.updateStatus('connecting');
       
       if (!this.socket) {
+        const basePath = import.meta.env.VITE_BASE_PATH || '';
         console.log(`Attempting to connect to ${this.serverUrl} namespace ${this.namespace}`);
         this.socket = io(this.serverUrl + this.namespace, {
           ...this.options,
@@ -46,13 +47,10 @@ class SocketClient {
           reconnectionDelay: 1000,
           transports: ['websocket', 'polling'],
           upgrade: true,
-          path: `/assistant/socket.io/`,
+          path: `${basePath}/socket.io/`,
           forceNew: true,
           multiplex: false,
         });
-        // TODO: FIX HARDCODED ASSISTANT HERE
-        // path: `${import.meta.env.VITE_BASE_PATH}/socket.io/`,
-        // causes some injection re-render which says "already trying to connect"
 
         this.socket.connect();
 
