@@ -1,0 +1,53 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: docker.nyc.xelaxer.com
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./assistant-web-client
+          platforms: linux/amd64
+          push: true
+          tags: |
+            docker.nyc.xelaxer.com/sbaw_webclient:${{ github.sha }}
+            docker.nyc.xelaxer.com/sbaw_webclient:latest
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, k3s-nyc, second-brain]
+    steps:
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set image
+        run: |
+          kubectl set image deployment/second-brain-webclient \
+            webclient=docker.nyc.xelaxer.com/sbaw_webclient:${{ github.sha }} \
+            -n second-brain
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/second-brain-webclient \
+            -n second-brain --timeout=3m
+
+      - name: Rollback on failure
+        if: failure()
+        run: kubectl rollout undo deployment/second-brain-webclient -n second-brain
