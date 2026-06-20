@@ -1,9 +1,14 @@
 import axios from 'axios';
 import { useUserStore } from '../store/userStore';
 
+const API_URL      = import.meta.env.VITE_API_URL || '';
 const API_BASE_PATH = import.meta.env.VITE_BASE_PATH || '';
-const API_PATH = import.meta.env.VITE_API_PATH || '/api/v1';
+const API_PATH     = import.meta.env.VITE_API_PATH || '/api/v1';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
+
+// In production, API_URL is absolute (https://api.sb.xelaxer.com).
+// In dev, it's empty and API_BASE_PATH is used as a relative prefix.
+const API_BASE = `${API_URL || API_BASE_PATH}${API_PATH}`;
 
 function getCookie(name) {
     const cookieName = `${encodeURIComponent(name)}=`;
@@ -25,7 +30,7 @@ function csrfHeaders() {
 }
 
 const baseApi = axios.create({
-    baseURL: `${API_BASE_PATH}${API_PATH}`,
+    baseURL: API_BASE,
     withCredentials: true,
 });
 
@@ -34,6 +39,13 @@ baseApi.interceptors.request.use((config) => {
     if (MUTATING_METHODS.has(method)) {
         config.headers = config.headers ?? {};
         Object.assign(config.headers, csrfHeaders());
+    }
+
+    // Forward Cloudflare Access JWT so api.sb.xelaxer.com can validate it
+    const cfToken = getCookie('CF_Authorization');
+    if (cfToken) {
+        config.headers = config.headers ?? {};
+        config.headers['CF-Access-Token'] = cfToken;
     }
 
     return config;
@@ -50,15 +62,18 @@ baseApi.interceptors.response.use(
 
         if ((status === 401 || status === 403) && !originalRequest._retry && !isAuthRecoveryEndpoint) {
             originalRequest._retry = true;
-            
+
             try {
                 // Try to refresh the token
-                await fetch(`${API_BASE_PATH}${API_PATH}/auth/refresh`, {
+                await fetch(`${API_BASE}/auth/refresh`, {
                     method: 'POST',
                     credentials: 'include',
-                    headers: csrfHeaders(),
+                    headers: {
+                        ...csrfHeaders(),
+                        ...(getCookie('CF_Authorization') ? { 'CF-Access-Token': getCookie('CF_Authorization') } : {}),
+                    },
                 });
-                
+
                 // Retry the original request
                 return baseApi(originalRequest);
             } catch (refreshError) {
@@ -68,7 +83,7 @@ baseApi.interceptors.response.use(
                 return Promise.reject(refreshError);
             }
         }
-        
+
         return Promise.reject(error);
     }
 );

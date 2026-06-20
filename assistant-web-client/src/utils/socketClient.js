@@ -38,8 +38,7 @@ class SocketClient {
       this.updateStatus('connecting');
       
       if (!this.socket) {
-        const basePath = import.meta.env.VITE_BASE_PATH || '';
-        console.log(`Attempting to connect to ${this.serverUrl} namespace ${this.namespace}`);
+          console.log(`Attempting to connect to ${this.serverUrl} namespace ${this.namespace}`);
         this.socket = io(this.serverUrl + this.namespace, {
           ...this.options,
           reconnection: true,
@@ -47,7 +46,7 @@ class SocketClient {
           reconnectionDelay: 1000,
           transports: ['websocket', 'polling'],
           upgrade: true,
-          path: `${basePath}/socket.io/`,
+          path: '/socket.io/',
           forceNew: true,
           multiplex: false,
         });
