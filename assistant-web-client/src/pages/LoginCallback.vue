@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../store/userStore'
+import baseApi from '../utils/baseApi'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,21 +16,17 @@ onMounted(async () => {
       return
     }
 
-    // Now make a second request to actually set the cookies
-    const response = await fetch(
-      `/assistant/api/v1/auth/validate-token?temp_token=${tempToken}`,
-      {
-        credentials: 'include'
-      }
-    )
+    const response = await baseApi.get('/auth/validate-token', {
+      params: { temp_token: tempToken }
+    })
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       throw new Error('Failed to complete authentication')
     }
 
     await userStore.checkAuth()
     router.push('/workspace')
-    
+
   } catch (error) {
     console.error('Authentication error:', error)
     router.push('/')
