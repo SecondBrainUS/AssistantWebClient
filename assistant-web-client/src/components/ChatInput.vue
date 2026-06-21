@@ -61,8 +61,8 @@
     <!-- Input and controls wrapper -->
     <div 
       class="flex-1 relative bg-gray-800 rounded-lg flex items-center"
-      @dragenter.prevent="isDragging = true"
-      @dragover.prevent="isDragging = true"
+      @dragenter.prevent="handleDragEnter"
+      @dragover.prevent
       @dragleave.prevent="handleDragLeave"
       @drop.prevent="handleFileDrop"
     >
@@ -74,6 +74,7 @@
         :placeholder="placeholder"
         @keyup.enter="handleEnter"
         @input="adjustTextareaHeight"
+        @paste="handlePaste"
       ></textarea>
       
       <!-- Attach Button -->
@@ -284,9 +285,15 @@ function handleFileInput(e) {
   e.target.value = null
 }
 
+function handleDragEnter() {
+  dragCounter.value++
+  isDragging.value = true
+}
+
 function handleDragLeave(e) {
   dragCounter.value--
-  if (dragCounter.value === 0) {
+  if (dragCounter.value <= 0) {
+    dragCounter.value = 0
     isDragging.value = false
   }
 }
@@ -294,12 +301,25 @@ function handleDragLeave(e) {
 function handleFileDrop(e) {
   isDragging.value = false
   dragCounter.value = 0
-  
+
   const files = Array.from(e.dataTransfer.files)
   if (files.length === 0) return
-  
-  // Process each file
+
   files.forEach(file => processFile(file))
+}
+
+function handlePaste(e) {
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  const imageItems = Array.from(items).filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+  if (imageItems.length === 0) return
+
+  e.preventDefault()
+  imageItems.forEach(item => {
+    const file = item.getAsFile()
+    if (file) processFile(file)
+  })
 }
 
 function processFile(file) {
