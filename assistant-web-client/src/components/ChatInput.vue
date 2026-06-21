@@ -72,7 +72,7 @@
         rows="1"
         class="flex-grow bg-transparent p-4 pr-36 focus:outline-none resize-none max-h-[144px] overflow-y-auto"
         :placeholder="placeholder"
-        @keyup.enter="handleEnter"
+        @keydown.enter="handleEnter"
         @input="adjustTextareaHeight"
         @paste="handlePaste"
       ></textarea>
@@ -237,15 +237,15 @@ function adjustTextareaHeight() {
 }
 
 function handleSend() {
-  if (!messageText.value.trim() && attachedFiles.value.length === 0) return
-  if (isUploading.value) return // Prevent sending if files are still uploading
-  
-  // Get IDs of successfully uploaded files
+  const text = messageText.value.trim()
+  if (!text && attachedFiles.value.length === 0) return
+  if (isUploading.value) return
+
   const fileIds = attachedFiles.value
     .filter(file => file.status === 'uploaded')
     .map(file => file.fileId)
-  
-  emit('send', messageText.value, fileIds)
+
+  emit('send', text, fileIds)
   messageText.value = ''
   attachedFiles.value = []
 }
