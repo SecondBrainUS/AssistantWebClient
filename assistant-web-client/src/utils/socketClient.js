@@ -215,6 +215,26 @@ class SocketClient {
     this.socket.on("room_left", callback);
   }
 
+  offRoomMessage(roomid) {
+    if (this.socket) this.socket.off(`receive_message ${roomid}`);
+  }
+
+  offRoomCreated() {
+    if (this.socket) this.socket.off("room_created");
+  }
+
+  offRoomJoined(roomid) {
+    if (this.socket) this.socket.off(`room_joined ${roomid}`);
+  }
+
+  offRoomError() {
+    if (this.socket) this.socket.off("room_error");
+  }
+
+  offRoomLeft() {
+    if (this.socket) this.socket.off("room_left");
+  }
+
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();

@@ -1073,7 +1073,7 @@ async function handleSend(message, fileIds = []) {
     }
   }
 
-  if (selectedModel.value.model_api_source == "aisuite") {
+  if (selectedModel.value.model_api_source == "aisuite" || selectedModel.value.model_api_source == "anthropic") {
     handleSendSBAW(message, localMessageId, fileIds);
     return;
   }
@@ -1250,11 +1250,11 @@ onUnmounted(() => {
   // Cleanup socket handlers
   if (props.socketClient) {
     props.socketClient.onStatusChange(null)
-    props.socketClient.onRoomMessage(null,null)
-    props.socketClient.onRoomCreated(null)
-    props.socketClient.onRoomJoined(roomid.value, null)
-    props.socketClient.onRoomError(null)
-    props.socketClient.onRoomLeft(null)
+    props.socketClient.offRoomMessage(roomid.value)
+    props.socketClient.offRoomCreated()
+    props.socketClient.offRoomJoined(roomid.value)
+    props.socketClient.offRoomError()
+    props.socketClient.offRoomLeft()
   }
   
   // Cleanup function timers
