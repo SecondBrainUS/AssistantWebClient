@@ -18,10 +18,18 @@
           @click.stop="isDropdownOpen = !isDropdownOpen"
         />
         
-        <div 
+        <div
           v-show="isDropdownOpen"
           class="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl z-50"
         >
+          <router-link
+            v-if="userStore.isAuthenticated"
+            to="/authorizations"
+            @click="isDropdownOpen = false"
+            class="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+          >
+            Authorizations
+          </router-link>
           <button
             @click="handleSignOut"
             class="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"

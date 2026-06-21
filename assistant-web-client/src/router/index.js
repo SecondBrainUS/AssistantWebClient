@@ -24,6 +24,12 @@ const router = createRouter({
     }
     ,
     {
+      path: '/authorizations',
+      name: 'authorizations',
+      component: () => import('@/pages/Authorizations.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/cloud',
       name: 'cloud',
       component: () => import('@/components/CloudBackground.vue'),
