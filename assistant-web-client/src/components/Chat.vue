@@ -691,23 +691,26 @@ async function setupSocketHandlers() {
   // Add message error handler
   props.socketClient.onMessageError((data) => {
     console.log("[CHAT] [ON MESSAGE ERROR] Error data:", data);
-    console.log("[CHAT] [ON MESSAGE ERROR] Current messages:", messages.value);
-    
-    const message = messages.value.find(m => 
+
+    const message = messages.value.find(m =>
       m.id === data.message_id || m.id === data.client_message_id
     );
-    
-    console.log("[CHAT] [ON MESSAGE ERROR] Found message:", message);
-    
+
     if (message) {
       message.error = data.error;
       messageStatuses.value.set(message.id, 'error');
-      
-      // If this is a function call that failed, stop its timer
+
       if (message.type === 'function_call' && message.call_id && functionTimers.value.has(message.call_id)) {
         stopFunctionTimer(message.call_id);
       }
     }
+
+    emit('notification', {
+      type: 'error',
+      message: data.error || 'The AI returned an error.',
+      duration: 8000,
+      id: Date.now()
+    });
   });
 }
 
