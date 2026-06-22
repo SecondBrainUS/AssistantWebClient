@@ -100,3 +100,40 @@ v2 development: `Dockerfile.dev` — dev server with HMR on port 3000
 **Audio context:** Web Audio API context may start suspended. If mic capture fails on first try, the context needs an explicit `.resume()` call.
 
 **v2 is a shell:** v2 currently only has login + workspace page. All rich features (audio, file upload, function cards, model options) are only in v1. New features go in v1 until v2 reaches feature parity.
+
+---
+
+## Send Routing (`src/utils/sendRouting.js`)
+
+`Chat.vue` uses `getSendPath(model_api_source)` to decide which Socket.IO path handles
+a `send_message` event. **Every new `model_api_source` value added to the webserver's
+`models.json` must have a corresponding entry here** — or the client silently misroutes
+messages (the `openai_realtime` two-message format gets sent instead of `sbaw`).
+
+```js
+// Current routing table:
+"aisuite"        → "sbaw"
+"anthropic"      → "sbaw"
+"openai_realtime" → "realtime"
+// Unknown source → null (logs an error, no send)
+```
+
+Tests in `src/tests/sendRouting.test.js` cross-check `getSendPath()` against every
+`model_api_source` in the webserver's `models.json` — the CI test job will fail if a
+new provider is added server-side but not wired up here.
+
+---
+
+## Tests (v1)
+
+**Runner:** Vitest (`npm run test` / `npm run test:watch`)
+
+**Test files:** `src/tests/sendRouting.test.js`
+
+**What's tested:**
+- Each known `model_api_source` returns the correct send path
+- Every `model_api_source` in the server's `models.json` has a client-side route
+
+CI runs tests on every push and PR to master (`ubuntu-latest`, `actions/setup-node@v4`, `npm ci → npm run test`). The build and deploy jobs are gated behind the test job passing.
+
+**Socket.IO cleanup pattern:** always use `socket.off(event)` (not `socket.on(event, null)`) for listener removal. The latter triggers `TypeError: t[n].apply is not a function` when the event fires. Cleanup helpers are in `socketClient.js`: `offRoomMessage`, `offRoomCreated`, `offRoomJoined`, `offRoomError`, `offRoomLeft`.

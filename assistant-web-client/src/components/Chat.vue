@@ -433,6 +433,7 @@ import ChatInput from './ChatInput.vue'
 import ModelSelector from './ModelSelector.vue'
 import baseApi from '../utils/baseApi';
 import audioHandler from '../utils/audioHandler';
+import { getSendPath } from '../utils/sendRouting';
 import ToolsMenu from './ToolsMenu.vue'
 import FunctionCard from './function-cards/FunctionCard.vue'
 import { hasCustomComponent } from './function-cards/FunctionComponentRegistry'
@@ -1073,7 +1074,7 @@ async function handleSend(message, fileIds = []) {
     }
   }
 
-  if (selectedModel.value.model_api_source == "aisuite" || selectedModel.value.model_api_source == "anthropic") {
+  if (getSendPath(selectedModel.value.model_api_source) === 'sbaw') {
     handleSendSBAW(message, localMessageId, fileIds);
     return;
   }
