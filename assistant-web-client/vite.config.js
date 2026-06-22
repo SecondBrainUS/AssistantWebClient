@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+// vitest config lives here alongside vite config (single source of truth)
 
 export default defineConfig(({ mode }) => {
   const fileEnv = loadEnv(mode, './env');
@@ -13,6 +14,9 @@ export default defineConfig(({ mode }) => {
   const socketProxyPath = `${basePath}/socket.io`;
   console.log('VITE_PORT ', VITE_PORT);
   return {
+    test: {
+      environment: 'node',
+    },
     plugins: [vue()],
     base: VITE_BASE_PATH || '/',
     resolve: {
