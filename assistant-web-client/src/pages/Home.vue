@@ -2,16 +2,28 @@
   <div class="w-full h-full bg-gray-700 text-gray-100 flex items-center justify-center relative overflow-hidden flex-col">
     <div class="glow"></div>
     <img src="@/assets/mush-v2-logo.png" alt="Logo" class="logo" />
-    <button 
-      v-if="!isAuthenticated"
-      @click="loginWithGoogle" 
+
+    <!-- Google mode: manual sign-in button -->
+    <button
+      v-if="!isAuthenticated && authMode === 'google'"
+      @click="loginWithGoogle"
       class="action-button"
     >
       Sign In
     </button>
-    <router-link 
+
+    <!-- Cloudflare mode: CF handles the login before the page loads; show a quiet indicator -->
+    <div
+      v-if="!isAuthenticated && authMode === 'cloudflare'"
+      class="action-button"
+      style="opacity: 0.5; cursor: default; pointer-events: none;"
+    >
+      Signing in…
+    </div>
+
+    <router-link
       v-if="isAuthenticated"
-      class="action-button" 
+      class="action-button"
       to="/workspace"
     >
       Go To Workspace
@@ -21,11 +33,22 @@
 
 <script setup>
 import { useUserStore } from '../store/userStore'
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { getAuthConfig } from '../utils/authConfig'
 
 const userStore = useUserStore()
-
 const isAuthenticated = computed(() => userStore.isAuthenticated)
+
+const authMode = ref('google')  // default until config loads
+
+onMounted(async () => {
+  try {
+    const config = await getAuthConfig()
+    authMode.value = config.auth_mode
+  } catch {
+    // backend unreachable — fall back to google mode UI
+  }
+})
 
 const loginWithGoogle = () => {
   window.location = `${import.meta.env.VITE_API_URL}${import.meta.env.VITE_BASE_PATH}/api/v1/auth/google/login`
@@ -67,7 +90,6 @@ const loginWithGoogle = () => {
   z-index: 0;
   filter: blur(100px);
   transform: translate(-50%, -50%);
-
 }
 
 .logo {
