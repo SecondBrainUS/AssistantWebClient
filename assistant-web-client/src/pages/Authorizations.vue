@@ -62,9 +62,16 @@
           </button>
         </div>
 
-        <!-- Tidal OAuth URL display -->
+        <!-- Failure feedback. Without this a failed request looked exactly like
+             a successful one: the button simply reset and nothing appeared. -->
+        <div v-if="tidal.error" class="mt-4 p-4 bg-red-900/40 border border-red-700 rounded-lg">
+          <p class="text-sm text-red-300">{{ tidal.error }}</p>
+        </div>
+
+        <!-- Tidal OAuth URL display. Kept even though the tab is opened for you,
+             because popup blockers routinely swallow window.open. -->
         <div v-if="tidal.authUrl" class="mt-4 p-4 bg-gray-700 rounded-lg">
-          <p class="text-sm text-gray-300 mb-2">Open this link to authorize Tidal, then come back — the connection completes automatically.</p>
+          <p class="text-sm text-gray-300 mb-2">A new tab should have opened. If it did not, use this link to authorize Tidal — this page updates on its own once you approve.</p>
           <a
             :href="tidal.authUrl"
             target="_blank"
@@ -79,7 +86,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import baseApi from '../utils/baseApi'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -87,7 +94,7 @@ const API_PATH = import.meta.env.VITE_API_PATH || '/api/v1'
 const spotifyLoginUrl = `${API_URL}${API_PATH}/auth/spotify/login`
 
 const spotify = ref({ loading: true, connected: false })
-const tidal = ref({ loading: true, connected: false, connecting: false, authUrl: null })
+const tidal = ref({ loading: true, connected: false, connecting: false, authUrl: null, error: null })
 
 async function checkStatuses() {
   const [spotifyRes, tidalRes] = await Promise.allSettled([
@@ -100,18 +107,68 @@ async function checkStatuses() {
   tidal.value.loading = false
 }
 
+// The webserver finishes the OAuth handshake on a background thread and writes
+// the session to Mongo, so nothing pushes the result back to this page. Without
+// polling, the card reads "Not connected" until a manual reload even though the
+// connection already succeeded.
+const POLL_INTERVAL_MS = 3000
+const POLL_WINDOW_MS = 10 * 60 * 1000 // matches the link's stated 10 minute expiry
+let pollTimer = null
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function startPollingForConnection() {
+  stopPolling()
+  const deadline = Date.now() + POLL_WINDOW_MS
+  pollTimer = setInterval(async () => {
+    if (Date.now() > deadline) {
+      stopPolling()
+      return
+    }
+    try {
+      const { data } = await baseApi.get('/auth/tidal/status')
+      if (data.connected) {
+        tidal.value.connected = true
+        tidal.value.authUrl = null
+        stopPolling()
+      }
+    } catch {
+      // A single failed poll is not worth surfacing — the user is mid-flow in
+      // another tab and the next tick retries. Only the deadline ends it.
+    }
+  }, POLL_INTERVAL_MS)
+}
+
 async function connectTidal() {
   tidal.value.connecting = true
   tidal.value.authUrl = null
+  tidal.value.error = null
   try {
     const { data } = await baseApi.get('/auth/tidal/login')
+    if (!data?.url) throw new Error('No authorization URL returned')
     tidal.value.authUrl = data.url
+
+    // Actually open it. The button said "Opening…" while only rendering a link
+    // further down the card, so to anyone watching the button nothing happened.
+    // The inline link stays as the fallback for when a popup blocker eats this.
+    window.open(data.url, '_blank', 'noopener')
+
+    startPollingForConnection()
   } catch (e) {
+    // Was console.error only, which made a genuine failure indistinguishable
+    // from success. Surface it where the user is looking.
     console.error('Failed to start Tidal auth:', e)
+    tidal.value.error = 'Could not start Tidal authorization. Please try again.'
   } finally {
     tidal.value.connecting = false
   }
 }
 
 onMounted(checkStatuses)
+onUnmounted(stopPolling)
 </script>
