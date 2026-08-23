@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import baseApi from '../utils/baseApi'
+import { getAuthConfig } from '../utils/authConfig'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -13,13 +14,27 @@ export const useUserStore = defineStore('user', {
   actions: {
     async initializeAuth() {
       if (this.authInitialized) return
-      
+
+      this.loading = true
       try {
-        this.loading = true
+        // Fast path: already have valid app cookies
         await this.checkAuth()
-      } catch (error) {
-        console.error('Failed to initialize auth:', error)
-        await this.logout()
+      } catch {
+        // No valid app session — check auth mode before giving up
+        try {
+          const { auth_mode } = await getAuthConfig()
+          if (auth_mode === 'cloudflare') {
+            // Bootstrap app session from the CF Access JWT that CF already set
+            await baseApi.post('/auth/cf/session')
+            await this.checkAuth()
+          } else {
+            // Google mode: user needs to click Sign In on the home page
+            this.isAuthenticated = false
+          }
+        } catch (err) {
+          console.warn('[auth] initializeAuth failed:', err)
+          this.isAuthenticated = false
+        }
       } finally {
         this.loading = false
         this.authInitialized = true
@@ -27,15 +42,10 @@ export const useUserStore = defineStore('user', {
     },
 
     async checkAuth() {
-      try {
-        const { data } = await baseApi.get('/auth/me')
-        this.user = data
-        this.isAuthenticated = true
-        this.profilePicture = data.picture
-      } catch (error) {
-        console.error('Auth check failed:', error)
-        throw error
-      }
+      const { data } = await baseApi.get('/auth/me')
+      this.user = data
+      this.isAuthenticated = true
+      this.profilePicture = data.picture
     },
 
     async logout() {
